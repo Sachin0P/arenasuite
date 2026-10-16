@@ -19,7 +19,27 @@
 
   <form method="post" action="/profile" class="stack">
     <label class="field"><span>Roll Number *</span><input name="rollNumber" value="{{$u.RollNumber}}" placeholder="e.g. 102303001" required></label>
-    <label class="field"><span>Branch *</span><input name="branch" value="{{$u.Branch}}" placeholder="e.g. Computer Science Engineering" required></label>
+    <label class="field"><span>Branch *</span><input name="branch" value="{{$u.Branch}}" placeholder="e.g. COE, COPC, ENC" list="branches" autocomplete="off" required></label>
+    {{/* Suggestions while typing; any other value can still be entered.
+         Codes from TIET's 2025 counselling list, plus older branches still in college. */}}
+    <datalist id="branches">
+      <option value="COE">Computer Engineering</option>
+      <option value="COPC">Computer Science & Engineering (Patiala Campus)</option>
+      <option value="COSE">Computer Science & Engineering (Derabassi Campus)</option>
+      <option value="COBS">Computer Science and Business Systems</option>
+      <option value="DSAI">Artificial Intelligence & Data Science</option>
+      <option value="ENC">Electronics and Computer Engineering</option>
+      <option value="ECE">Electronics and Communication Engineering</option>
+      <option value="EEC">Electrical and Computer Engineering</option>
+      <option value="RAI">Robotics and Artificial Intelligence</option>
+      <option value="EVD">Electronics Engineering (VLSI Design and Technology)</option>
+      <option value="EIC">Electronics (Instrumentation & Control) Engineering</option>
+      <option value="ELE">Electrical Engineering</option>
+      <option value="MEE">Mechanical Engineering</option>
+      <option value="MEC">Mechatronics</option>
+      <option value="CIE">Civil Engineering</option>
+      <option value="CHE">Chemical Engineering</option>
+    </datalist>
     <label class="field"><span>College</span><input name="college" value="{{or $u.College $.Data.DefaultCollege}}"></label>
     <div><button class="btn btn-primary">Save Changes</button></div>
   </form>
