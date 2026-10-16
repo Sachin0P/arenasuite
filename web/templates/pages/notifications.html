@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="container narrow page">
+  <div class="row between mb">
+    <h1>Notifications</h1>
+    {{if gt .Unread 0}}
+      <form method="post" action="/notifications/read-all"><button class="link-btn">Mark all as read</button></form>
+    {{end}}
+  </div>
+
+  {{if .Data.Notifications}}
+  <div class="list">
+    {{range .Data.Notifications}}
+    <div class="list-row {{if not .IsRead}}unread{{end}}">
+      <div>
+        <p>{{.Message}}</p>
+        <p class="tiny-text faint">{{datetime .CreatedAt}}</p>
+      </div>
+      {{if not .IsRead}}
+        <form method="post" action="/notifications/{{.ID}}/read"><button class="link-btn">Mark read</button></form>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{else}}{{template "empty" dict "Title" "No notifications yet"}}{{end}}
+</div>
+{{end}}

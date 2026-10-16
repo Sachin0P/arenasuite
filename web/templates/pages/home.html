@@ -1,0 +1,37 @@
+{{define "content"}}
+<section class="hero">
+  <h1>COMPETE. CONNECT. WIN.</h1>
+  <p>Discover and participate in college competitions — all in one place.</p>
+  <div class="row" style="justify-content:center">
+    <a href="/competitions" class="btn btn-primary">Explore Competitions</a>
+    <a href="/organize" class="btn">Organize an Event</a>
+  </div>
+</section>
+
+<div class="container page stack-lg">
+  <div class="grid">
+    <a href="/sports" class="card category-card" data-category="SPORTS">
+      <h2>Sports</h2>
+      <p class="small muted">Cricket, football, basketball & more</p>
+      <span class="accent">Explore Sports &rarr;</span>
+    </a>
+    <a href="/academic" class="card category-card" data-category="ACADEMIC">
+      <h2>Academic</h2>
+      <p class="small muted">Hackathons, quizzes, debates & more</p>
+      <span class="accent">Explore Academic &rarr;</span>
+    </a>
+    <a href="/esports" class="card category-card" data-category="ESPORTS">
+      <h2>Esports</h2>
+      <p class="small muted">BGMI, Valorant, FIFA & more</p>
+      <span class="accent">Explore Esports &rarr;</span>
+    </a>
+  </div>
+
+  {{range .Data.Sections}}
+  <section>
+    <h2 class="mb">{{.Title}}</h2>
+    {{template "comp-grid" .Competitions}}
+  </section>
+  {{end}}
+</div>
+{{end}}

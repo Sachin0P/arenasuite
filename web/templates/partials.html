@@ -1,0 +1,159 @@
+{{/* Small reusable pieces. Use them with {{template "name" value}}. */}}
+
+{{/* A user's picture, or their first letter in a circle. */}}
+{{define "avatar"}}{{if .ProfilePicture}}<img src="{{.ProfilePicture}}" alt="" class="avatar">{{else}}<span class="avatar">{{initial .Name}}</span>{{end}}{{end}}
+
+{{/* Coloured status pill, e.g. {{template "status" "approved"}} */}}
+{{define "status"}}<span class="pill {{statusColor .}}">{{label .}}</span>{{end}}
+
+{{/* Category tag in the category's colour. */}}
+{{define "cat"}}<span class="pill cat cat-{{.}}">{{lower .}}</span>{{end}}
+
+{{/* Empty state: {{template "empty" dict "Title" "No teams yet" "Sub" "..."}} */}}
+{{define "empty"}}<div class="empty"><strong>{{.Title}}</strong>{{with .Sub}}<p class="mt">{{.}}</p>{{end}}</div>{{end}}
+
+{{/* One competition card. */}}
+{{define "comp-card"}}
+<a href="/competitions/{{.ID}}" class="card flush" data-category="{{.Category}}">
+  <div class="banner-img">{{if .Banner}}<img src="{{.Banner}}" alt="">{{else}}No banner{{end}}</div>
+  <div class="card-body">
+    <div class="row">{{template "cat" .Category}} {{template "status" .Status}}</div>
+    <h3 class="mt">{{.Name}}</h3>
+    <p class="small muted">{{.OrganizerName}}{{with .OrganizerCollege}} · {{.}}{{end}}</p>
+    <div class="small mt">
+      <p>{{date .StartDate}}</p>
+      <p>{{if .Venue}}{{.Venue}}{{if eq .Mode "online"}} (Online){{end}}{{else if eq .Mode "online"}}Online{{else}}TBA{{end}}</p>
+      <p class="muted">Register by {{date .RegistrationDeadline}}</p>
+    </div>
+    <div class="row between small mt">
+      <span class="muted">{{.TeamsCount}} {{plural .TeamsCount "team" "teams"}}</span>
+      <span class="bold">{{fee .RegistrationFee}}</span>
+    </div>
+  </div>
+</a>
+{{end}}
+
+{{/* A grid of competition cards, or an empty state. */}}
+{{define "comp-grid"}}
+{{if .}}<div class="grid">{{range .}}{{template "comp-card" .}}{{end}}</div>
+{{else}}{{template "empty" dict "Title" "Nothing to show yet"}}{{end}}
+{{end}}
+
+{{/* Team card with an optional "Request to Join" button.
+     Needs: dict "Team" team "User" $.User "Requests" map-of-pending-requests */}}
+{{define "team-card"}}
+{{$t := .Team}}
+<div class="card">
+  <div class="row between">
+    <a href="/teams/{{$t.ID}}" class="bold">{{$t.Name}}</a>
+    <span class="tiny-text muted">{{$t.MemberCount}}/{{$t.MaxMembers}} members</span>
+  </div>
+  <p class="tiny-text muted">{{$t.CompetitionName}} · Captain: {{$t.CaptainName}}</p>
+  {{if $t.LookingForMembers}}
+    <div class="small mt">
+      {{with $t.LookingForRole}}<p>Looking for: <b>{{.}}</b></p>{{end}}
+      {{with $t.RequiredSkills}}<p class="tiny-text muted">Skills: {{.}}</p>{{end}}
+    </div>
+  {{end}}
+  {{if and .User $t.LookingForMembers (not $t.IsFull) (ne $t.CaptainID .User.ID)}}
+    {{$requestID := index .Requests $t.ID}}
+    {{if $requestID}}
+      <form method="post" action="/join-requests/{{$requestID}}/cancel" class="mt">
+        <button class="btn btn-sm btn-block">Request sent · Withdraw</button>
+      </form>
+    {{else}}
+      <form method="post" action="/teams/{{$t.ID}}/join-request" class="mt stack">
+        <input name="message" placeholder="Short message to the captain (optional)">
+        <button class="btn btn-sm btn-block">Request to Join</button>
+      </form>
+    {{end}}
+  {{end}}
+</div>
+{{end}}
+
+{{/* Standings table. Needs: dict "Rows" standings "Academic" bool */}}
+{{define "standings"}}
+{{if .Rows}}
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>#</th><th>Team</th>
+      {{if not .Academic}}<th class="num">P</th><th class="num">W</th><th class="num">L</th><th class="num">D</th><th class="num">+/-</th>{{end}}
+      <th class="right">Points</th>
+    </tr></thead>
+    <tbody>
+    {{range .Rows}}
+      <tr>
+        <td class="muted">{{.Rank}}</td>
+        <td class="bold">{{.TeamName}}</td>
+        {{if not $.Academic}}<td class="num">{{.Played}}</td><td class="num">{{.Won}}</td><td class="num">{{.Lost}}</td><td class="num">{{.Draw}}</td><td class="num">{{.ScoreDifference}}</td>{{end}}
+        <td class="right bold">{{.Points}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{else}}{{template "empty" dict "Title" "No standings yet" "Sub" "Standings appear once teams are approved and results come in."}}{{end}}
+{{end}}
+
+{{/* Knockout bracket: one column per round. */}}
+{{define "bracket"}}
+<div class="bracket">
+  {{range rounds .}}
+  <div class="bracket-round">
+    <h4>{{.Name}}</h4>
+    {{range .Matches}}
+    {{$done := eq .Status "completed"}}
+    <div class="bracket-match">
+      <div class="bracket-team {{if and .WinnerID (eq .WinnerID .TeamAID)}}{{if $done}}won{{end}}{{end}}">
+        <span>{{or .TeamAName "TBD"}}</span><span class="muted">{{with .ScoreA}}{{.}}{{end}}</span>
+      </div>
+      <div class="bracket-team {{if and .WinnerID (eq .WinnerID .TeamBID)}}{{if $done}}won{{end}}{{end}}">
+        <span>{{or .TeamBName "TBD"}}</span><span class="muted">{{with .ScoreB}}{{.}}{{end}}</span>
+      </div>
+      <div class="bracket-foot">{{template "status" .Status}}</div>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{/* Simple list of matches (round robin, dashboards). */}}
+{{define "match-list"}}
+<div class="list">
+  {{range .}}
+  <div class="list-row">
+    <div>
+      <p class="tiny-text faint">{{.Round}}</p>
+      <p class="bold">{{or .TeamAName "TBD"}} vs {{or .TeamBName "TBD"}}</p>
+      {{with .ScheduledAt}}<p class="tiny-text muted">{{datetime .}}</p>{{end}}
+    </div>
+    <div class="right">
+      <p class="bold">{{with .ScoreA}}{{.}}{{else}}-{{end}} : {{with .ScoreB}}{{.}}{{else}}-{{end}}</p>
+      {{template "status" .Status}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{/* Side menus for the organizer and admin areas. Pass the active section. */}}
+{{define "organizer-side"}}
+<nav class="side">
+  <a href="/organizer" {{if eq . "overview"}}class="active"{{end}}>Dashboard</a>
+  <a href="/organizer/competitions" {{if eq . "competitions"}}class="active"{{end}}>My Competitions</a>
+  <a href="/organizer/competitions/new">+ New Competition</a>
+  <a href="/organizer/settings" {{if eq . "settings"}}class="active"{{end}}>Settings</a>
+</nav>
+{{end}}
+
+{{define "admin-side"}}
+<nav class="side">
+  <a href="/admin" {{if eq . "overview"}}class="active"{{end}}>Overview</a>
+  <a href="/admin/users" {{if eq . "users"}}class="active"{{end}}>Users</a>
+  <a href="/admin/organizations" {{if eq . "organizations"}}class="active"{{end}}>Organizations</a>
+  <a href="/admin/competitions" {{if eq . "competitions"}}class="active"{{end}}>Competitions</a>
+  <a href="/admin/reports" {{if eq . "reports"}}class="active"{{end}}>Reports</a>
+</nav>
+{{end}}

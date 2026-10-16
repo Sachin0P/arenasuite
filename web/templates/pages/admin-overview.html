@@ -1,0 +1,26 @@
+{{define "content"}}
+{{$s := .Data.Stats}}
+<div class="container page shell">
+  {{template "admin-side" .Data.Section}}
+  <div class="stack-lg">
+    <h1>Admin Panel</h1>
+    <div class="grid stats">
+      <div class="stat"><strong>{{$s.TotalUsers}}</strong><span>Total Users</span></div>
+      <div class="stat"><strong>{{$s.TotalOrganizations}}</strong><span>Organizations</span></div>
+      <div class="stat"><strong>{{$s.TotalCompetitions}}</strong><span>Total Competitions</span></div>
+      <div class="stat"><strong>{{$s.ActiveCompetitions}}</strong><span>Active Competitions</span></div>
+      <div class="stat"><strong>{{$s.TotalTeams}}</strong><span>Total Teams</span></div>
+      <div class="stat"><strong>{{$s.TotalRegistrations}}</strong><span>Total Registrations</span></div>
+      <div class="stat"><strong>{{$s.OpenReports}}</strong><span>Open Reports</span></div>
+    </div>
+    <section>
+      <h2 class="mb">By Category</h2>
+      <div class="row">
+        {{range categories}}
+        <div class="card row" data-category="{{.}}"><span class="bold accent">{{.}}</span><span class="muted">{{index $s.ByCategory .}}</span></div>
+        {{end}}
+      </div>
+    </section>
+  </div>
+</div>
+{{end}}

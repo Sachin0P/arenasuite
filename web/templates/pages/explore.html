@@ -1,0 +1,44 @@
+{{/* Used by /competitions (all categories) and /sports, /academic, /esports
+     (LockedCategory set, title band in the category colour). */}}
+{{define "content"}}
+{{$d := .Data}}
+<div class="band" {{with $d.LockedCategory}}data-category="{{.}}"{{end}}>
+  <div class="container">
+    <h1>{{$d.Heading}}</h1>
+    <p class="muted">{{if $d.LockedCategory}}Every {{lower $d.LockedCategory}} competition on ArenaSuite.{{else}}Search and filter every competition on the platform.{{end}}</p>
+  </div>
+</div>
+
+<div class="container page">
+  {{/* A plain GET form: filters end up in the URL, so results are shareable. */}}
+  <form method="get" class="inputs-row mb">
+    <input name="q" value="{{$d.Filter.Q}}" placeholder="Search competitions..." style="flex:1;min-width:200px">
+    {{if not $d.LockedCategory}}
+    <select name="category">
+      <option value="">All categories</option>
+      {{range categories}}<option value="{{.}}" {{if eq . $d.Filter.Category}}selected{{end}}>{{label (lower .)}}</option>{{end}}
+    </select>
+    {{end}}
+    <select name="mode">
+      <option value="">Any mode</option>
+      <option value="offline" {{if eq $d.Filter.Mode "offline"}}selected{{end}}>Offline</option>
+      <option value="online" {{if eq $d.Filter.Mode "online"}}selected{{end}}>Online</option>
+    </select>
+    <select name="free">
+      <option value="">Free & paid</option>
+      <option value="true" {{if eq $d.Filter.Free "true"}}selected{{end}}>Free only</option>
+      <option value="false" {{if eq $d.Filter.Free "false"}}selected{{end}}>Paid only</option>
+    </select>
+    <select name="sort">
+      <option value="">Starting soonest</option>
+      <option value="closingSoon" {{if eq $d.Filter.Sort "closingSoon"}}selected{{end}}>Deadline soonest</option>
+      <option value="popular" {{if eq $d.Filter.Sort "popular"}}selected{{end}}>Most popular</option>
+      <option value="recent" {{if eq $d.Filter.Sort "recent"}}selected{{end}}>Recently added</option>
+    </select>
+    <label class="check"><input type="checkbox" name="open" value="true" {{if $d.Open}}checked{{end}}> Registration open</label>
+    <button class="btn btn-primary">Search</button>
+  </form>
+
+  {{template "comp-grid" $d.Competitions}}
+</div>
+{{end}}

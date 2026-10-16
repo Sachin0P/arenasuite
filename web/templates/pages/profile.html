@@ -1,0 +1,27 @@
+{{/* Doubles as the onboarding screen: new users land here until they add
+     their roll number and branch. */}}
+{{define "content"}}
+{{$u := .User}}
+<div class="container tiny page stack-lg">
+  <h1>Profile</h1>
+  {{if not $u.ProfileComplete}}
+    <p class="notice">Add your roll number and branch to finish setting up your account.</p>
+  {{end}}
+
+  <div class="row" style="gap:12px">
+    {{if $u.ProfilePicture}}<img src="{{$u.ProfilePicture}}" alt="" class="avatar big">{{else}}<span class="avatar big">{{initial $u.Name}}</span>{{end}}
+    <div>
+      <p class="bold">{{$u.Name}}</p>
+      <p class="small muted">{{$u.Email}}</p>
+      <span class="pill">{{$u.Role}}</span>
+    </div>
+  </div>
+
+  <form method="post" action="/profile" class="stack">
+    <label class="field"><span>Roll Number *</span><input name="rollNumber" value="{{$u.RollNumber}}" placeholder="e.g. 102303001" required></label>
+    <label class="field"><span>Branch *</span><input name="branch" value="{{$u.Branch}}" placeholder="e.g. Computer Science Engineering" required></label>
+    <label class="field"><span>College</span><input name="college" value="{{$u.College}}"></label>
+    <div><button class="btn btn-primary">Save Changes</button></div>
+  </form>
+</div>
+{{end}}

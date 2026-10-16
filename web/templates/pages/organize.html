@@ -1,0 +1,21 @@
+{{/* Creating an organization IS how you become an organizer. */}}
+{{define "content"}}
+<div class="container tiny page" style="text-align:center">
+  <h1>Organize an Event</h1>
+  <p class="muted mt">Create competitions, manage registrations, run fixtures, and publish live results — all from one dashboard.</p>
+
+  {{if not .User}}
+    <a href="/auth/login" class="btn btn-primary mt-lg">Sign in to Get Started</a>
+  {{else if .Data.Orgs}}
+    <a href="/organizer" class="btn btn-primary mt-lg">Go to Organizer Dashboard</a>
+  {{else}}
+    <form method="post" action="/organizations" class="card stack mt-lg" style="text-align:left">
+      <p class="bold">Create your organization to get started</p>
+      <input name="name" placeholder="Organization name (e.g. HackTIET)" required>
+      <input name="college" placeholder="College" value="{{.User.College}}" required>
+      <textarea name="description" rows="2" placeholder="Short description (optional)"></textarea>
+      <button class="btn btn-primary btn-block">Create Organization</button>
+    </form>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,35 @@
+{{define "content"}}
+<div class="container page shell">
+  {{template "organizer-side" .Data.Section}}
+  <div>
+    <div class="row between mb">
+      <h1>My Competitions</h1>
+      <a href="/organizer/competitions/new" class="btn btn-primary btn-sm">+ New Competition</a>
+    </div>
+    {{if .Data.Competitions}}
+    <div class="list">
+      {{range .Data.Competitions}}
+      <div class="list-row">
+        <div>
+          <div class="row">{{template "cat" .Category}} {{template "status" .Status}}</div>
+          <p class="bold mt">{{.Name}}</p>
+          <p class="tiny-text muted">{{date .StartDate}} · {{.TeamsCount}} teams · {{.RegistrationsCount}} registrations</p>
+        </div>
+        <div class="row">
+          <a href="/organizer/competitions/{{.ID}}/manage" class="btn btn-sm">Manage</a>
+          {{if eq .Status "draft"}}
+            <form method="post" action="/competitions/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="published"><button class="btn btn-primary btn-sm">Publish</button></form>
+          {{else if eq .Status "published"}}
+            <form method="post" action="/competitions/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="draft"><button class="btn btn-sm">Unpublish</button></form>
+          {{end}}
+          {{if and (ne .Status "cancelled") (ne .Status "completed")}}
+            <form method="post" action="/competitions/{{.ID}}/status" class="inline" data-confirm="Cancel {{.Name}}?"><input type="hidden" name="status" value="cancelled"><button class="link-btn danger">Cancel</button></form>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{else}}{{template "empty" dict "Title" "No competitions yet"}}{{end}}
+  </div>
+</div>
+{{end}}

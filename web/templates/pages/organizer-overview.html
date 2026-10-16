@@ -1,0 +1,26 @@
+{{define "content"}}
+{{$s := .Data.Stats}}
+<div class="container page shell">
+  {{template "organizer-side" .Data.Section}}
+  <div class="stack-lg">
+    <h1>Organizer Dashboard</h1>
+    <div class="grid stats">
+      <div class="stat"><strong>{{$s.Total}}</strong><span>Total Competitions</span></div>
+      <div class="stat"><strong>{{$s.Active}}</strong><span>Active Competitions</span></div>
+      <div class="stat"><strong>{{$s.Registrations}}</strong><span>Total Registrations</span></div>
+      <div class="stat"><strong>{{$s.Teams}}</strong><span>Total Teams</span></div>
+      <div class="stat"><strong>{{$s.UpcomingMatches}}</strong><span>Upcoming Matches</span></div>
+      <div class="stat"><strong>{{$s.CompletedMatches}}</strong><span>Completed Matches</span></div>
+    </div>
+    <section>
+      <div class="row between mb">
+        <h2>My Competitions</h2>
+        <a href="/organizer/competitions/new" class="btn btn-primary btn-sm">+ New</a>
+      </div>
+      {{if .Data.Competitions}}
+        <div class="grid">{{range .Data.Competitions}}{{template "comp-card" .}}{{end}}</div>
+      {{else}}{{template "empty" dict "Title" "No competitions yet" "Sub" "Create your first competition to get started."}}{{end}}
+    </section>
+  </div>
+</div>
+{{end}}
