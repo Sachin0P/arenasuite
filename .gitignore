@@ -6,3 +6,4 @@ data/
 *.db-shm
 /arenasuite
 .DS_Store
+.vscode
