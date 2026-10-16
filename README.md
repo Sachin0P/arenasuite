@@ -3,6 +3,10 @@
 A competition platform for Thapar University, with three sections: **Sports**,
 **Academic** and **Esports**.
 
+**Live site: <https://arenasuite.onrender.com>** (sign in with your
+`@thapar.edu` Google account). It runs on a free plan, so if nobody has
+visited for a while, the first page load takes about a minute.
+
 - **Students** find competitions, form or join teams, register, and follow
   fixtures and live scores.
 - **Organizers** create competitions, approve registrations, generate
@@ -245,52 +249,70 @@ Where to make a change:
   standings: 3 points for a win, 1 for a draw, ranked by points, then score
   difference, then wins.
 
-## Deploying (Render + Neon, free)
+## Deployment
 
-The repo includes a `render.yaml`, so Render can set up the service from it.
-Both services have free tiers. The catch: Render's free app **sleeps after
-about 15 minutes without visitors**, and the next visit takes about a minute
-to wake it.
+The live site runs on two free services:
 
-**1. Create the database on Neon**
+| Part | Service | Details |
+|---|---|---|
+| App | [Render](https://render.com) web service `arenasuite` | Free plan, Singapore region, built from the `Dockerfile` using `render.yaml` |
+| Database | [Neon](https://neon.tech) Postgres | Free plan, Singapore region |
 
-1. Sign up at [neon.tech](https://neon.tech) and create a project. Pick the
-   **Singapore** region (closest to India and to Render's Singapore servers).
-2. On the project dashboard, click **Connect**, turn **Connection pooling
-   off**, and copy the connection string (`postgresql://...neon.tech/neondb?sslmode=require...`).
+### Updating the live site
 
-**2. Create the app on Render**
+- **Code changes:** push to `main`. Render rebuilds and redeploys
+  automatically in a few minutes. Watch progress under **Events** and
+  **Logs** on the Render service page.
+- **Database changes:** edit `internal/db/schema.sql`. It runs on every
+  start, so new tables appear on the next deploy. A new column on an existing
+  table needs an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...` line.
+- **Settings** (`ADMIN_EMAILS`, Google keys, …): change them on Render under
+  **Environment**. Saving restarts the app. Don't put production values in
+  git.
+- **Check it's up:** <https://arenasuite.onrender.com/healthz> shows `ok`
+  when the app is running and can reach the database.
 
-1. Sign up at [render.com](https://render.com) with GitHub, and allow it to
-   access this repository.
-2. Click **New → Blueprint**, pick the repository and confirm. Render reads
-   `render.yaml` and asks for the secret values:
-   - `DATABASE_URL`: the Neon connection string from step 1
-   - `BASE_URL`: `https://arenasuite.onrender.com` (if Render gives the
-     service a different address, update this afterwards)
-   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: from Google Cloud Console
-   - `ADMIN_EMAILS`: your email, so you're admin after signing in
-3. Click **Apply**. The first build takes a few minutes. When it's done, the
-   service page shows the site's address (`https://<name>.onrender.com`).
-   If it differs from `BASE_URL`, fix `BASE_URL` under **Environment**.
+### Looking after the data
 
-**3. Allow the live address in Google**
+- The live database's connection string is only stored in Render (as
+  `DATABASE_URL`) and in Neon's dashboard. It contains the password, so
+  never commit it or paste it in chats. If it leaks, reset the password in
+  Neon (**Roles → neondb_owner → Reset password**) and update `DATABASE_URL`
+  on Render.
+- **Backups:** Neon can restore the database to an earlier point in time
+  (limited history on the free plan). For your own copy:
+  `pg_dump "<connection URL>" > backup.sql`.
+- Don't run `go run ./cmd/seed` or experiments against the live database.
+  Use a local database or a Neon `dev` branch instead (see
+  [Sharing a database](#sharing-a-database)).
 
-In Google Cloud Console → your OAuth client → **Authorized redirect URIs**,
-add `https://<name>.onrender.com/auth/google/callback`, then save.
+### Setting it up from scratch
 
-**4. Try it**
+Follow these steps if you ever need to recreate the deployment (for example,
+in a new account).
 
-Open the site and sign in with Google. Tables are created automatically on
-the first start. Every push to `main` redeploys the site.
+**1. Database (Neon).** Create a project in the **Singapore** region. On the
+dashboard click **Connect**, turn **Connection pooling off**, and copy the
+connection string (`postgresql://...neon.tech/neondb?sslmode=require...`).
 
-Good to know:
+**2. App (Render).** Sign up with GitHub and allow access to this repository.
+Click **New → Blueprint** and pick the repository. Render reads
+`render.yaml` and asks for:
 
-- Render sets `PORT` itself; leave it unset.
-- Logs are under **Logs** on the Render service page. `cannot reach the
-  database` means `DATABASE_URL` is wrong.
-- Neon keeps a short history of your data (point-in-time restore), and you can
-  export a backup any time with `pg_dump "<connection URL>" > backup.sql`.
+- `DATABASE_URL`: the Neon connection string
+- `BASE_URL`: the site's address, e.g. `https://arenasuite.onrender.com`
+  (no trailing slash; fix it under **Environment** if Render picks a
+  different name)
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- `ADMIN_EMAILS`: who should be admin after their first sign-in
+
+Render generates `SESSION_SECRET` itself and sets `PORT`.
+`render.yaml` also sets `TRUST_PROXY=true` and `DEV_LOGIN=false`.
+
+**3. Google.** In Google Cloud Console → your OAuth client →
+**Authorized redirect URIs**, add `<BASE_URL>/auth/google/callback`.
+
+**4.** Open the site and sign in. Tables are created on the first start.
 
 ### Other hosts
 
