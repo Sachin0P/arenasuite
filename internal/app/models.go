@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"arenasuite/internal/db"
@@ -255,6 +256,26 @@ type Notification struct {
 	ReferenceID int64  `db:"reference_id" json:"referenceId"`
 	IsRead      bool   `db:"is_read" json:"isRead"`
 	CreatedAt   string `db:"created_at" json:"createdAt"`
+}
+
+// Link is the page where the user can act on the notification, or "" if
+// there is none. ReferenceID is a competition id for registration types and
+// a team id for team types.
+func (n Notification) Link() string {
+	if n.ReferenceID == 0 {
+		return ""
+	}
+	switch n.Type {
+	case "registrationSubmitted":
+		return fmt.Sprintf("/organizer/competitions/%d/manage#registrations", n.ReferenceID)
+	case "registrationApproved", "registrationRejected":
+		return fmt.Sprintf("/competitions/%d", n.ReferenceID)
+	case "teamJoinRequest", "teamInvitationResponse":
+		return fmt.Sprintf("/teams/%d", n.ReferenceID)
+	case "teamInvitation":
+		return "/dashboard" // invitations are accepted from the dashboard
+	}
+	return ""
 }
 
 type Report struct {

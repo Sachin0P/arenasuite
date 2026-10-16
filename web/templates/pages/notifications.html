@@ -15,9 +15,12 @@
         <p>{{.Message}}</p>
         <p class="tiny-text faint">{{datetime .CreatedAt}}</p>
       </div>
-      {{if not .IsRead}}
-        <form method="post" action="/notifications/{{.ID}}/read"><button class="link-btn">Mark read</button></form>
-      {{end}}
+      <div class="row">
+        {{with .Link}}<a href="{{.}}" class="btn btn-sm">View</a>{{end}}
+        {{if not .IsRead}}
+          <form method="post" action="/notifications/{{.ID}}/read"><button class="link-btn">Mark read</button></form>
+        {{end}}
+      </div>
     </div>
     {{end}}
   </div>

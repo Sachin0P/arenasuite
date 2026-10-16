@@ -278,7 +278,7 @@ func (a *App) RequestToJoin(user *User, teamID int64, message string) error {
 	if err != nil {
 		return err
 	}
-	a.Notify(t.CaptainID, "teamJoinRequest", user.Name+" requested to join "+t.Name, requestID)
+	a.Notify(t.CaptainID, "teamJoinRequest", user.Name+" requested to join "+t.Name, teamID)
 	a.toCompetition(t.CompetitionID, "teamJoinRequest", map[string]int64{"teamId": teamID, "requestId": requestID})
 	return nil
 }
@@ -391,11 +391,10 @@ func (a *App) InviteMember(user *User, teamID, inviteeID int64) error {
 	if pending > 0 {
 		return fail(409, "An invitation is already pending for this user")
 	}
-	invitationID, err := db.Insert(a.DB, `INSERT INTO team_invitations (team_id, user_id, invited_by) VALUES (?, ?, ?)`, teamID, inviteeID, user.ID)
-	if err != nil {
+	if _, err := a.DB.Exec(`INSERT INTO team_invitations (team_id, user_id, invited_by) VALUES (?, ?, ?)`, teamID, inviteeID, user.ID); err != nil {
 		return err
 	}
-	a.Notify(inviteeID, "teamInvitation", "You have been invited to join "+t.Name, invitationID)
+	a.Notify(inviteeID, "teamInvitation", "You have been invited to join "+t.Name, teamID)
 	return nil
 }
 
@@ -448,7 +447,7 @@ func (a *App) RespondInvitation(user *User, invitationID int64, accept bool) err
 	if err != nil {
 		return err
 	}
-	a.Notify(t.CaptainID, "teamInvitation", user.Name+" "+verb+" your invitation to "+t.Name, t.ID)
+	a.Notify(t.CaptainID, "teamInvitationResponse", user.Name+" "+verb+" your invitation to "+t.Name, t.ID)
 	return nil
 }
 

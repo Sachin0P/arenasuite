@@ -22,7 +22,7 @@ func (a *App) getRegistration(id int64) (*Registration, error) {
 
 // Register signs the user up for a competition: individually when teamID is
 // 0, otherwise on behalf of a team they captain. It starts as "pending" until
-// the organizer approves it.
+// the organizer approves it, so the organizer is notified.
 func (a *App) Register(user *User, competitionID, teamID int64) error {
 	c, err := a.getCompetition(a.DB, competitionID)
 	if err != nil {
@@ -32,7 +32,8 @@ func (a *App) Register(user *User, competitionID, teamID int64) error {
 		return fail(400, "Registration is closed for this competition")
 	}
 
-	return a.inTx(func(tx *db.Tx) error {
+	who := user.Name
+	err = a.inTx(func(tx *db.Tx) error {
 		// A cancelled registration shouldn't block signing up again, so clear
 		// it out first (the table allows one row per user / team).
 		if _, err := tx.Exec(`DELETE FROM registrations WHERE competition_id = ? AND status = 'cancelled' AND (user_id = ? OR team_id = ?)`,
@@ -94,8 +95,15 @@ func (a *App) Register(user *User, competitionID, teamID int64) error {
 		if db.IsUniqueViolation(err) {
 			return fail(409, "This team is already registered")
 		}
+		who = "Team " + t.Name
 		return err
 	})
+	if err != nil {
+		return err
+	}
+	a.Notify(c.OrgOwnerID, "registrationSubmitted", who+" registered for "+c.Name+" and is awaiting your approval", competitionID)
+	a.toCompetition(competitionID, "registrationSubmitted", map[string]int64{"competitionId": competitionID})
+	return nil
 }
 
 // RegistrationsFor lists a competition's registrations for its organizer.

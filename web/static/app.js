@@ -178,7 +178,7 @@ if ((signedIn || competitionId) && window.EventSource) {
         }
       }, 200);
     };
-    for (const name of ["scoreUpdated", "matchStatusUpdated", "standingsUpdated", "registrationApproved", "registrationRejected", "teamJoinRequest"]) {
+    for (const name of ["scoreUpdated", "matchStatusUpdated", "standingsUpdated", "registrationSubmitted", "registrationApproved", "registrationRejected", "teamJoinRequest"]) {
       events.addEventListener(name, refresh);
     }
     events.addEventListener("announcementCreated", (e) => {

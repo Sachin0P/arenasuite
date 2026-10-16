@@ -188,6 +188,7 @@ func (s *Server) manageCompetitionPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "manage-competition", "Manage "+c.Name, map[string]any{
 		"Competition": c, "Registrations": registrations, "Teams": teams, "Matches": matches,
 		"Standings": standings, "Announcements": announcements, "Section": "competitions",
+		"LiveID": c.ID, // new registrations show up without a reload
 	})
 }
 
