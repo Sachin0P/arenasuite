@@ -1,0 +1,37 @@
+# Render "Blueprint": tells Render how to run ArenaSuite.
+# In Render: New → Blueprint → pick this repo. It builds the Dockerfile and
+# redeploys automatically on every push to main.
+#
+# Values marked "sync: false" are secrets: Render asks you to paste them in
+# when you create the Blueprint (they are never stored in git).
+services:
+  - type: web
+    name: arenasuite
+    runtime: docker
+    plan: free
+    region: singapore          # closest Render region to India; put the Neon database there too
+    healthCheckPath: /healthz  # Render checks this to know the app is up
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL      # Neon connection string
+        sync: false
+      - key: BASE_URL          # e.g. https://arenasuite.onrender.com (no trailing slash)
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS      # your email, so you become admin on first sign-in
+        sync: false
+      - key: SESSION_SECRET    # Render generates a random one
+        generateValue: true
+      - key: TIMEZONE
+        value: Asia/Kolkata
+      - key: ALLOWED_EMAIL_DOMAIN
+        value: thapar.edu
+      - key: DEFAULT_COLLEGE
+        value: Thapar University
+      - key: TRUST_PROXY       # Render puts a proxy in front of the app
+        value: "true"
+      - key: DEV_LOGIN         # never on in production
+        value: "false"

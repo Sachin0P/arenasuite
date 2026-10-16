@@ -29,6 +29,10 @@ type Config struct {
 	// DevLogin shows a "sign in as any user" list on the login page.
 	// It exists so you can try the app without Google. Never enable in production.
 	DevLogin bool
+
+	// TrustProxy: the app runs behind a hosting proxy that sets
+	// X-Forwarded-For (Render, Fly, Railway, Caddy...). Leave off locally.
+	TrustProxy bool
 }
 
 func Load() Config {
@@ -52,6 +56,7 @@ func Load() Config {
 		AllowedEmailDomain: strings.ToLower(get("ALLOWED_EMAIL_DOMAIN", "thapar.edu")),
 		DefaultCollege:     get("DEFAULT_COLLEGE", "Thapar University"),
 		DevLogin:           get("DEV_LOGIN", "false") == "true",
+		TrustProxy:         get("TRUST_PROXY", "false") == "true",
 	}
 	for _, e := range strings.Split(get("ADMIN_EMAILS", ""), ",") {
 		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {

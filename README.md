@@ -116,6 +116,7 @@ variables override the file.
 | `DEFAULT_COLLEGE` | College pre-filled for new users | `Thapar University` |
 | `ADMIN_EMAILS` | Comma-separated emails made admin when they sign in. Removing an email later does **not** remove admin; use the Admin Panel for that | empty |
 | `DEV_LOGIN` | Sign in as any user without Google (local testing only) | `false` |
+| `TRUST_PROXY` | Set to `true` when deployed behind a hosting proxy (Render, Fly, Caddy…) so rate limiting sees each visitor's real address | `false` |
 
 ### Google sign-in
 
@@ -244,31 +245,57 @@ Where to make a change:
   standings: 3 points for a win, 1 for a draw, ranked by points, then score
   difference, then wins.
 
-## Deploying
+## Deploying (Render + Neon, free)
 
-You need two things: somewhere to run the app and a hosted Postgres. The app
-must run as **one always-on instance**, because live updates are kept in its
-memory and use long-lived connections.
+The repo includes a `render.yaml`, so Render can set up the service from it.
+Both services have free tiers. The catch: Render's free app **sleeps after
+about 15 minutes without visitors**, and the next visit takes about a minute
+to wake it.
 
-| App host | Database | Cost |
-|---|---|---|
-| Render (web service, builds from the `Dockerfile`) | Neon or Supabase | Free tiers exist; Render's free tier sleeps when idle, so the first visit is slow |
-| Railway | Railway Postgres | Paid after trial credit; simplest setup |
-| Fly.io | Fly Postgres or Neon | Paid, small |
-| Google Cloud Run (max instances 1, timeout 60 min) | Neon | Free allowance; needs a billing account |
-| A Linux VPS with Caddy for HTTPS (Oracle Always Free, or GitHub Student Pack credits) | Postgres on the same server, or Neon | Free or cheap |
+**1. Create the database on Neon**
 
-**Not suitable:** Vercel, Netlify and AWS Lambda. They cut the long
-connections live updates need. Free tiers change often, so check current
-limits.
+1. Sign up at [neon.tech](https://neon.tech) and create a project. Pick the
+   **Singapore** region (closest to India and to Render's Singapore servers).
+2. On the project dashboard, click **Connect**, turn **Connection pooling
+   off**, and copy the connection string (`postgresql://...neon.tech/neondb?sslmode=require...`).
 
-Before going live:
+**2. Create the app on Render**
 
-- Set `DATABASE_URL` (the live database, not the dev one), `BASE_URL=https://your-domain`,
-  a new `SESSION_SECRET`, and `DEV_LOGIN=false`.
-- Add `https://your-domain/auth/google/callback` to the Google OAuth client.
-- Turn on backups in your database provider (or schedule `pg_dump`).
-- **Known issue:** the rate limiter (300 requests/minute per visitor) uses the
-  connection's address. Behind a hosting proxy every visitor shares the
-  proxy's address, so it needs to read `X-Forwarded-For` first. See
-  `clientIP` in `internal/server/ratelimit.go`.
+1. Sign up at [render.com](https://render.com) with GitHub, and allow it to
+   access this repository.
+2. Click **New → Blueprint**, pick the repository and confirm. Render reads
+   `render.yaml` and asks for the secret values:
+   - `DATABASE_URL`: the Neon connection string from step 1
+   - `BASE_URL`: `https://arenasuite.onrender.com` (if Render gives the
+     service a different address, update this afterwards)
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: from Google Cloud Console
+   - `ADMIN_EMAILS`: your email, so you're admin after signing in
+3. Click **Apply**. The first build takes a few minutes. When it's done, the
+   service page shows the site's address (`https://<name>.onrender.com`).
+   If it differs from `BASE_URL`, fix `BASE_URL` under **Environment**.
+
+**3. Allow the live address in Google**
+
+In Google Cloud Console → your OAuth client → **Authorized redirect URIs**,
+add `https://<name>.onrender.com/auth/google/callback`, then save.
+
+**4. Try it**
+
+Open the site and sign in with Google. Tables are created automatically on
+the first start. Every push to `main` redeploys the site.
+
+Good to know:
+
+- Render sets `PORT` itself; leave it unset.
+- Logs are under **Logs** on the Render service page. `cannot reach the
+  database` means `DATABASE_URL` is wrong.
+- Neon keeps a short history of your data (point-in-time restore), and you can
+  export a backup any time with `pg_dump "<connection URL>" > backup.sql`.
+
+### Other hosts
+
+The app must run as **one always-on instance**, because live updates are kept
+in its memory and use long-lived connections. Railway, Fly.io, Google Cloud
+Run (max instances 1, 60-minute timeout) or any Linux VPS with Caddy for
+HTTPS all work. Set `TRUST_PROXY=true` on them. **Not suitable:** Vercel,
+Netlify and AWS Lambda, which cut the long connections live updates need.

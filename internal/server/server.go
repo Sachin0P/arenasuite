@@ -48,7 +48,7 @@ func New(a *app.App) *Server {
 // ServeHTTP runs for every request: rate limit, then load the signed-in
 // user (if any) into the request context, then route.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !s.limiter.allow(clientIP(r)) {
+	if !s.limiter.allow(clientIP(r, s.app.Cfg.TrustProxy)) {
 		http.Error(w, "Too many requests, slow down a little.", http.StatusTooManyRequests)
 		return
 	}
@@ -67,6 +67,7 @@ func (s *Server) routes() {
 	static, _ := fs.Sub(web.FS, "static")
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
 	m.HandleFunc("GET /events", s.events)
+	m.HandleFunc("GET /healthz", s.health)
 
 	// Public pages
 	m.HandleFunc("GET /{$}", s.homePage)
@@ -164,6 +165,16 @@ func (s *Server) routes() {
 
 	// Anything else is a 404 page.
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { s.notFound(w, r) })
+}
+
+// health is used by hosting platforms to check the app is up and can reach
+// the database.
+func (s *Server) health(w http.ResponseWriter, r *http.Request) {
+	if err := s.app.DB.PingContext(r.Context()); err != nil {
+		http.Error(w, "database unreachable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Write([]byte("ok"))
 }
 
 // ---------- the signed-in user ----------
