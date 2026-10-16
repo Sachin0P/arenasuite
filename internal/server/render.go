@@ -178,21 +178,13 @@ type matchRound struct {
 	Matches []app.Match
 }
 
-// formatTime understands both formats we store: form dates
-// ("2026-10-20T10:00", local time) and SQLite timestamps
-// ("2026-10-20 10:00:00", UTC).
+// formatTime reformats a stored time ("2026-10-20T10:00", local time) for
+// display, e.g. "Oct 20, 2026". Plain dates ("2026-10-20") work too.
 func formatTime(s, layout string) string {
-	if s == "" {
-		return ""
-	}
-	if t, err := time.ParseInLocation(app.DateTimeLayout, s, time.Local); err == nil {
-		return t.Format(layout)
-	}
-	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
-		return t.Local().Format(layout)
-	}
-	if t, err := time.ParseInLocation("2006-01-02", s, time.Local); err == nil {
-		return t.Format(layout)
+	for _, in := range []string{app.DateTimeLayout, "2006-01-02"} {
+		if t, err := time.ParseInLocation(in, s, time.Local); err == nil {
+			return t.Format(layout)
+		}
 	}
 	return s
 }

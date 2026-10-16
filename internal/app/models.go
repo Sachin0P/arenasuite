@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"arenasuite/internal/db"
 	"arenasuite/internal/tournament"
 )
 
@@ -268,12 +269,8 @@ type Report struct {
 	ReporterName string `db:"reporter_name"`
 }
 
-// Competition dates are stored the way an <input type="datetime-local">
-// sends them ("2026-10-20T10:00"), in the server's local time. Keeping one
-// format means plain string comparison sorts them correctly.
-const DateTimeLayout = "2006-01-02T15:04"
+// DateTimeLayout is how dates appear in forms and templates
+// ("2026-10-20T10:00", local time). See db.TimeLayout.
+const DateTimeLayout = db.TimeLayout
 
 func nowLocal() string { return time.Now().Format(DateTimeLayout) }
-
-// sqlNow is the same "now" for use inside SQL queries.
-const sqlNow = "strftime('%Y-%m-%dT%H:%M', 'now', 'localtime')"

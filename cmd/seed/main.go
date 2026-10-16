@@ -19,7 +19,10 @@ import (
 
 func main() {
 	cfg := config.Load()
-	conn, err := db.Open(cfg.DBPath)
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required. See .env.example.")
+	}
+	conn, err := db.Open(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,7 +40,7 @@ func main() {
 	ids := map[string]int64{}
 	for i, u := range users {
 		// Seed users get a roll number and branch so they skip onboarding.
-		_, err := conn.Exec(`
+		id, err := db.Insert(conn, `
 			INSERT INTO users (google_id, name, email, role, college, roll_number, branch)
 			VALUES (?, ?, ?, ?, ?, ?, 'Computer Engineering')
 			ON CONFLICT (google_id) DO UPDATE SET name = excluded.name, role = excluded.role`,
@@ -45,8 +48,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		var id int64
-		conn.QueryRow(`SELECT id FROM users WHERE google_id = ?`, u.googleID).Scan(&id)
 		ids[u.googleID] = id
 		fmt.Printf("%-12s %-30s id=%d\n", u.role, u.email, id)
 	}
@@ -55,15 +56,15 @@ func main() {
 	var orgID int64
 	conn.QueryRow(`SELECT id FROM organizations WHERE name = 'Thapar Sports & Tech Club'`).Scan(&orgID)
 	if orgID == 0 {
-		res, err := conn.Exec(`INSERT INTO organizations (name, description, college, verified, created_by)
-			VALUES ('Thapar Sports & Tech Club', 'Runs the campus leagues, hackathons and LAN nights.', ?, 1, ?)`,
+		newID, err := db.Insert(conn, `INSERT INTO organizations (name, description, college, verified, created_by)
+			VALUES ('Thapar Sports & Tech Club', 'Runs the campus leagues, hackathons and LAN nights.', ?, TRUE, ?)`,
 			cfg.DefaultCollege, ids["seed-organizer"])
 		if err != nil {
 			log.Fatal(err)
 		}
-		orgID, _ = res.LastInsertId()
+		orgID = newID
 
-		at := func(days int) string { return time.Now().AddDate(0, 0, days).Format("2006-01-02T15:04") }
+		at := func(days int) time.Time { return time.Now().AddDate(0, 0, days).Truncate(time.Hour) }
 		comps := []struct{ name, category, typ, format, venue, mode string }{
 			{"Inter-Hostel Football Cup", "SPORTS", "Football", "knockout", "Main Ground", "offline"},
 			{"HackTIET 2026", "ACADEMIC", "Hackathon", "staged", "Library Auditorium", "offline"},

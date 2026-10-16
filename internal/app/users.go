@@ -52,12 +52,11 @@ func (a *App) LoginWithGoogle(g *auth.GoogleUser) (*User, error) {
 		role = "admin"
 	}
 	// Everyone signing in is from the same college, so fill it in for them.
-	res, err := a.DB.Exec(`INSERT INTO users (google_id, name, email, profile_picture, role, college) VALUES (?, ?, ?, ?, ?, ?)`,
+	id, err := db.Insert(a.DB, `INSERT INTO users (google_id, name, email, profile_picture, role, college) VALUES (?, ?, ?, ?, ?, ?)`,
 		g.Sub, g.Name, email, db.NullIfEmpty(g.Picture), role, db.NullIfEmpty(a.Cfg.DefaultCollege))
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return a.UserByID(id)
 }
 

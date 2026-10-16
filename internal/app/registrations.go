@@ -1,8 +1,6 @@
 package app
 
 import (
-	"database/sql"
-
 	"arenasuite/internal/db"
 )
 
@@ -34,7 +32,7 @@ func (a *App) Register(user *User, competitionID, teamID int64) error {
 		return fail(400, "Registration is closed for this competition")
 	}
 
-	return a.inTx(func(tx *sql.Tx) error {
+	return a.inTx(func(tx *db.Tx) error {
 		// A cancelled registration shouldn't block signing up again, so clear
 		// it out first (the table allows one row per user / team).
 		if _, err := tx.Exec(`DELETE FROM registrations WHERE competition_id = ? AND status = 'cancelled' AND (user_id = ? OR team_id = ?)`,

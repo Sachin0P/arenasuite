@@ -1,52 +1,105 @@
-// Package db opens the SQLite database and provides two small helpers,
-// All and One, that run a query and copy the rows into Go structs.
+// Package db connects to PostgreSQL and provides small helpers: All and One
+// run a query and copy the rows into Go structs, Insert returns the new id.
 package db
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
-	_ "modernc.org/sqlite" // pure-Go SQLite driver, registers itself as "sqlite"
+	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib" // Postgres driver, registers itself as "pgx"
 )
 
 //go:embed schema.sql
 var schema string
 
-// Querier is anything we can run SQL on: the database itself or a transaction.
-// Functions accept a Querier so they work both inside and outside a transaction.
+// TimeLayout is how times are shown and typed in forms: the same format an
+// <input type="datetime-local"> uses ("2026-10-20T10:00"), in local time.
+const TimeLayout = "2006-01-02T15:04"
+
+// Querier is anything we can run SQL on: the database or a transaction.
+// Functions accept a Querier so they work both inside and outside one.
 type Querier interface {
 	Exec(query string, args ...any) (sql.Result, error)
 	Query(query string, args ...any) (*sql.Rows, error)
 	QueryRow(query string, args ...any) *sql.Row
 }
 
-// Open creates the database file (and folder) if needed and applies the schema.
-func Open(path string) (*sql.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
-	}
-	// Pragmas in the DSN run on every new connection:
-	//   foreign_keys  – enforce REFERENCES / ON DELETE CASCADE
-	//   journal_mode  – WAL lets readers and a writer work at the same time
-	//   busy_timeout  – wait up to 5s for a lock instead of failing immediately
-	// _txlock=immediate takes the write lock when a transaction starts, which
-	// avoids "database is locked" errors when two transactions race.
-	dsn := "file:" + path +
-		"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_txlock=immediate"
-	conn, err := sql.Open("sqlite", dsn)
+// DB and Tx wrap database/sql so our queries can use "?" placeholders
+// (easy to read and build up) while Postgres gets the "$1, $2" it needs.
+type DB struct{ *sql.DB }
+type Tx struct{ *sql.Tx }
+
+func (d *DB) Exec(q string, args ...any) (sql.Result, error) { return d.DB.Exec(rebind(q), args...) }
+func (d *DB) Query(q string, args ...any) (*sql.Rows, error) { return d.DB.Query(rebind(q), args...) }
+func (d *DB) QueryRow(q string, args ...any) *sql.Row        { return d.DB.QueryRow(rebind(q), args...) }
+func (t *Tx) Exec(q string, args ...any) (sql.Result, error) { return t.Tx.Exec(rebind(q), args...) }
+func (t *Tx) Query(q string, args ...any) (*sql.Rows, error) { return t.Tx.Query(rebind(q), args...) }
+func (t *Tx) QueryRow(q string, args ...any) *sql.Row        { return t.Tx.QueryRow(rebind(q), args...) }
+
+func (d *DB) Begin() (*Tx, error) {
+	tx, err := d.DB.Begin()
+	return &Tx{tx}, err
+}
+
+// Open connects using a URL like postgres://user:pass@host:5432/dbname and
+// creates any missing tables.
+func Open(url string) (*DB, error) {
+	conn, err := sql.Open("pgx", url)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := conn.Exec(schema); err != nil {
+	// Free hosted databases allow only a few connections, so keep the pool small.
+	conn.SetMaxOpenConns(10)
+	conn.SetMaxIdleConns(5)
+	conn.SetConnMaxIdleTime(5 * time.Minute)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := conn.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("cannot reach the database (check DATABASE_URL): %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, schema); err != nil {
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
-	return conn, nil
+	return &DB{conn}, nil
+}
+
+// rebind turns "?" placeholders into Postgres's "$1", "$2"... in order.
+// Question marks inside 'quoted strings' are left alone.
+func rebind(query string) string {
+	if !strings.Contains(query, "?") {
+		return query
+	}
+	var b strings.Builder
+	n, inQuote := 0, false
+	for _, r := range query {
+		switch {
+		case r == '\'':
+			inQuote = !inQuote
+			b.WriteRune(r)
+		case r == '?' && !inQuote:
+			n++
+			b.WriteString("$" + strconv.Itoa(n))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// Insert runs an INSERT and returns the new row's id.
+func Insert(q Querier, query string, args ...any) (int64, error) {
+	var id int64
+	err := q.QueryRow(query+" RETURNING id", args...).Scan(&id)
+	return id, err
 }
 
 // All runs a query and returns every row as a T.
@@ -117,27 +170,21 @@ func scanInto(rows *sql.Rows, columns []string, dest any) error {
 	return nil
 }
 
-// fieldsByTag maps "column_name" -> struct field index, including fields of
-// embedded structs (so a TeamRow can embed Team and add extra columns).
+// fieldsByTag maps "column_name" -> struct field index.
 func fieldsByTag(t reflect.Type) map[string][]int {
 	out := map[string][]int{}
 	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		if f.Anonymous && f.Type.Kind() == reflect.Struct {
-			for col, idx := range fieldsByTag(f.Type) {
-				out[col] = append([]int{i}, idx...)
-			}
-			continue
-		}
-		if tag := f.Tag.Get("db"); tag != "" {
-			out[tag] = f.Index
+		if tag := t.Field(i).Tag.Get("db"); tag != "" {
+			out[tag] = t.Field(i).Index
 		}
 	}
 	return out
 }
 
-// setField converts a raw SQLite value (int64, float64, string, []byte or nil)
-// into whatever type the struct field has.
+// setField converts a value from the driver (int64, float64, bool, string,
+// []byte, time.Time or nil) into whatever type the struct field has.
+// Times are stored in string fields as local "2026-10-20T10:00", which is
+// what the templates and date inputs expect.
 func setField(field reflect.Value, raw any) error {
 	if raw == nil {
 		field.Set(reflect.Zero(field.Type()))
@@ -159,6 +206,8 @@ func setField(field reflect.Value, raw any) error {
 			field.SetString(r)
 		case []byte:
 			field.SetString(string(r))
+		case time.Time:
+			field.SetString(r.In(time.Local).Format(TimeLayout))
 		default:
 			field.SetString(fmt.Sprint(r))
 		}
@@ -181,20 +230,22 @@ func setField(field reflect.Value, raw any) error {
 			return errors.New("expected a number")
 		}
 	case reflect.Bool:
-		r, ok := raw.(int64)
+		r, ok := raw.(bool)
 		if !ok {
-			return errors.New("expected 0 or 1")
+			return errors.New("expected true or false")
 		}
-		field.SetBool(r != 0)
+		field.SetBool(r)
 	default:
 		return fmt.Errorf("unsupported field type %s", field.Type())
 	}
 	return nil
 }
 
-// IsUniqueViolation reports whether err came from a UNIQUE constraint.
+// IsUniqueViolation reports whether err came from a UNIQUE constraint
+// (Postgres error code 23505).
 func IsUniqueViolation(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "UNIQUE")
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // NullIfEmpty turns "" into SQL NULL so optional text columns stay NULL.
@@ -211,4 +262,19 @@ func NullIfZero(n int64) any {
 		return nil
 	}
 	return n
+}
+
+// LocalTime turns a form value like "2026-10-20T10:00" (local time) into a
+// time.Time for the database. Empty means NULL.
+func LocalTime(s string) (any, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	for _, layout := range []string{TimeLayout, "2006-01-02T15:04:05", "2006-01-02"} {
+		if t, err := time.ParseInLocation(layout, s, time.Local); err == nil {
+			return t, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid date %q", s)
 }

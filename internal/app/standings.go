@@ -1,8 +1,6 @@
 package app
 
 import (
-	"database/sql"
-
 	"arenasuite/internal/db"
 	"arenasuite/internal/tournament"
 )
@@ -67,7 +65,7 @@ func (a *App) RecomputeStandings(user *User, competitionID int64) error {
 	if _, err := a.competitionToManage(user, competitionID); err != nil {
 		return err
 	}
-	err := a.inTx(func(tx *sql.Tx) error { return recomputeStandings(tx, competitionID) })
+	err := a.inTx(func(tx *db.Tx) error { return recomputeStandings(tx, competitionID) })
 	if err == nil {
 		a.toCompetition(competitionID, "standingsUpdated", map[string]int64{"competitionId": competitionID})
 	}
@@ -96,7 +94,7 @@ func (a *App) SetAcademicScore(user *User, competitionID, teamID, points int64) 
 		return fail(404, "Team not found for this competition")
 	}
 
-	err = a.inTx(func(tx *sql.Tx) error {
+	err = a.inTx(func(tx *db.Tx) error {
 		_, err := tx.Exec(`
 			INSERT INTO standings (competition_id, team_id, points, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
 			ON CONFLICT (competition_id, team_id) DO UPDATE SET points = excluded.points, updated_at = CURRENT_TIMESTAMP`,

@@ -48,10 +48,10 @@ func (a *App) ListCompetitions(user *User, f Filter) ([]Competition, error) {
 		add("c.category = ?", f.Category)
 	}
 	if f.Type != "" {
-		add("c.type LIKE ?", "%"+f.Type+"%")
+		add("c.type ILIKE ?", "%"+f.Type+"%")
 	}
 	if f.College != "" {
-		add("o.college LIKE ?", "%"+f.College+"%")
+		add("o.college ILIKE ?", "%"+f.College+"%")
 	}
 	if f.OrganizationID != 0 {
 		add("c.organization_id = ?", f.OrganizationID)
@@ -66,7 +66,7 @@ func (a *App) ListCompetitions(user *User, f Filter) ([]Competition, error) {
 		add("c.start_date <= ?", f.DateTo)
 	}
 	if f.Q != "" {
-		add("c.name LIKE ?", "%"+f.Q+"%")
+		add("c.name ILIKE ?", "%"+f.Q+"%")
 	}
 	switch f.Free {
 	case "true":
@@ -75,11 +75,10 @@ func (a *App) ListCompetitions(user *User, f Filter) ([]Competition, error) {
 		add("c.registration_fee > 0")
 	}
 	if f.RegistrationOpen {
-		add("c.status = 'published' AND c.registration_deadline >= " + sqlNow)
+		add("c.status = 'published' AND c.registration_deadline >= now()")
 	}
 	if f.ClosingSoonDays > 0 {
-		add(fmt.Sprintf("c.status = 'published' AND c.registration_deadline BETWEEN %s AND strftime('%%Y-%%m-%%dT%%H:%%M', 'now', 'localtime', '+%d days')",
-			sqlNow, f.ClosingSoonDays))
+		add("c.status = 'published' AND c.registration_deadline BETWEEN now() AND now() + make_interval(days => ?)", f.ClosingSoonDays)
 	}
 
 	// Who sees what: the public never sees drafts. Owners see their own
@@ -170,6 +169,9 @@ type CompetitionInput struct {
 	Rules, Format                             string
 	Stages                                    []string // Academic only
 	Status                                    string   // "draft" or "published" (create only)
+
+	// The three dates as real times, filled in by validate().
+	start, end, deadline any
 }
 
 func (in *CompetitionInput) validate() error {
@@ -197,6 +199,16 @@ func (in *CompetitionInput) validate() error {
 	}
 	if in.EndDate < in.StartDate {
 		return fail(400, "End date must be after the start date")
+	}
+	// Turn the form's "2026-10-20T10:00" text into times for the database.
+	var errs [3]error
+	in.start, errs[0] = db.LocalTime(in.StartDate)
+	in.end, errs[1] = db.LocalTime(in.EndDate)
+	in.deadline, errs[2] = db.LocalTime(in.RegistrationDeadline)
+	for _, err := range errs {
+		if err != nil {
+			return fail(400, "Please enter valid dates")
+		}
 	}
 	return nil
 }
@@ -226,7 +238,7 @@ func (a *App) CreateCompetition(user *User, in CompetitionInput) (int64, error) 
 		status = "published"
 	}
 
-	res, err := a.DB.Exec(`
+	id, err := db.Insert(a.DB, `
 		INSERT INTO competitions (
 			organization_id, name, description, category, type, banner,
 			start_date, end_date, registration_deadline, venue, mode,
@@ -234,13 +246,13 @@ func (a *App) CreateCompetition(user *User, in CompetitionInput) (int64, error) 
 			status, created_by
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		in.OrganizationID, in.Name, db.NullIfEmpty(in.Description), in.Category, db.NullIfEmpty(in.Type), db.NullIfEmpty(in.Banner),
-		in.StartDate, in.EndDate, in.RegistrationDeadline, db.NullIfEmpty(in.Venue), in.Mode,
+		in.start, in.end, in.deadline, db.NullIfEmpty(in.Venue), in.Mode,
 		db.NullIfZero(in.MaxTeamSize), db.NullIfZero(in.MaxTeams), in.RegistrationFee, db.NullIfEmpty(in.Rules), in.Format, in.stagesJSON(),
 		status, user.ID)
 	if err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 func (a *App) UpdateCompetition(user *User, id int64, in CompetitionInput) error {
@@ -260,7 +272,7 @@ func (a *App) UpdateCompetition(user *User, id int64, in CompetitionInput) error
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		in.Name, db.NullIfEmpty(in.Description), in.Category, db.NullIfEmpty(in.Type), db.NullIfEmpty(in.Banner),
-		in.StartDate, in.EndDate, in.RegistrationDeadline, db.NullIfEmpty(in.Venue), in.Mode,
+		in.start, in.end, in.deadline, db.NullIfEmpty(in.Venue), in.Mode,
 		db.NullIfZero(in.MaxTeamSize), db.NullIfZero(in.MaxTeams), in.RegistrationFee, db.NullIfEmpty(in.Rules), in.Format, in.stagesJSON(),
 		id)
 	return err

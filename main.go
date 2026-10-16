@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	_ "time/tzdata" // bundles timezone data, so TIMEZONE works on any server
 
 	"arenasuite/internal/app"
 	"arenasuite/internal/config"
@@ -21,13 +22,17 @@ func main() {
 	if cfg.SessionSecret == "" {
 		log.Fatal("SESSION_SECRET is required (any long random string). See .env.example.")
 	}
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required, e.g. postgres://user:password@localhost:5432/arenasuite. See .env.example.")
+	}
+	setTimezone(cfg.Timezone)
 	if cfg.DevLogin {
 		log.Println("WARNING: DEV_LOGIN is on — anyone can sign in as any user. Never use this in production.")
 	}
 
-	database, err := db.Open(cfg.DBPath)
+	database, err := db.Open(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("open database: %v", err)
+		log.Fatal(err)
 	}
 	defer database.Close()
 
@@ -41,4 +46,14 @@ func main() {
 	}
 	log.Printf("ArenaSuite running at %s", cfg.BaseURL)
 	log.Fatal(srv.ListenAndServe())
+}
+
+// setTimezone makes every time on the site use the college's timezone,
+// even when the server itself runs in UTC (as most hosting does).
+func setTimezone(name string) {
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		log.Fatalf("unknown TIMEZONE %q: %v", name, err)
+	}
+	time.Local = loc
 }

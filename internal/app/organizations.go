@@ -1,7 +1,6 @@
 package app
 
 import (
-	"database/sql"
 	"strings"
 
 	"arenasuite/internal/db"
@@ -40,13 +39,13 @@ func (a *App) CreateOrganization(user *User, in OrganizationInput) (int64, error
 		return 0, fail(400, "Organization name is required")
 	}
 	var id int64
-	err := a.inTx(func(tx *sql.Tx) error {
-		res, err := tx.Exec(`INSERT INTO organizations (name, description, logo, college, created_by) VALUES (?, ?, ?, ?, ?)`,
+	err := a.inTx(func(tx *db.Tx) error {
+		newID, err := db.Insert(tx, `INSERT INTO organizations (name, description, logo, college, created_by) VALUES (?, ?, ?, ?, ?)`,
 			in.Name, db.NullIfEmpty(in.Description), db.NullIfEmpty(in.Logo), db.NullIfEmpty(in.College), user.ID)
 		if err != nil {
 			return err
 		}
-		id, _ = res.LastInsertId()
+		id = newID
 		_, err = tx.Exec(`UPDATE users SET role = 'organizer', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND role = 'participant'`, user.ID)
 		return err
 	})

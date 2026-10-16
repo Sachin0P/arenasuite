@@ -10,16 +10,50 @@ A competition platform for Thapar University, with three sections: **Sports**,
 - **Admins** manage users, verify organizations, hide competitions and handle
   reports.
 
-It's written in Go using only the standard library plus one package,
-[`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite) (a pure-Go
-SQLite driver, so no C compiler is needed). Pages are server-rendered with
-`html/template`, with one CSS file and one small JavaScript file. It's a
-rewrite of the earlier Node/Express + Angular version.
+It's written in Go and stores its data in **PostgreSQL**. It uses the Go
+standard library plus one package: [`pgx`](https://github.com/jackc/pgx), the
+Postgres driver. Pages are server-rendered with `html/template`, with one CSS
+file and one small JavaScript file. It's a rewrite of the earlier
+Node/Express + Angular version.
 
 ## Getting started
 
-You need **Go 1.27 or newer** (`go version` to check). The `sqlite3` command
-line tool is optional but handy.
+You need:
+
+- **Go 1.27 or newer** (check with `go version`)
+- **A PostgreSQL database**: either one on your own computer, or a free
+  hosted one. Pick one of the options below.
+
+### 1. Get a database
+
+**Option A: PostgreSQL on your Mac (Homebrew)**
+
+```sh
+brew install postgresql@17
+brew services start postgresql@17      # runs in the background, starts at login
+/opt/homebrew/opt/postgresql@17/bin/createdb arenasuite
+```
+
+Your connection URL is
+`postgres://YOUR_MAC_USERNAME@localhost:5432/arenasuite?sslmode=disable`.
+Run `whoami` to see your username.
+
+**Option B: Docker (any OS)**
+
+```sh
+docker run -d --name arenasuite-db -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=arenasuite postgres:17
+```
+
+Your connection URL is
+`postgres://postgres:postgres@localhost:5432/arenasuite?sslmode=disable`.
+
+**Option C: A free hosted database (Neon or Supabase)**
+
+Create a project and copy its connection string. This is also how a team
+shares one database; see [Sharing a database](#sharing-a-database).
+
+### 2. Configure and run
 
 ```sh
 git clone https://github.com/Sachin0P/arenasuite.git
@@ -27,33 +61,30 @@ cd arenasuite
 cp .env.example .env
 ```
 
-Open `.env` and change two values:
+Open `.env` and set:
 
 ```sh
+DATABASE_URL=<your connection URL from step 1>
 SESSION_SECRET=<any long random text>   # e.g. the output of: openssl rand -hex 32
-DEV_LOGIN=true                          # lets you sign in without Google (local only)
+DEV_LOGIN=true                          # sign in without Google (local only)
 ```
 
-Then start the server:
+Then:
 
 ```sh
-go run .
+go run ./cmd/seed     # optional: sample users, an organization, 3 competitions
+go run .              # start the server
 ```
 
 Open **http://localhost:4000** (use `localhost`, not `127.0.0.1`). Stop the
-server with **Ctrl+C**.
+server with **Ctrl+C**. Tables are created automatically on the first start.
 
 ### Signing in locally
 
 With `DEV_LOGIN=true`, the login page has a **Dev login** box that lets you
-sign in as any user in the database without Google. To add sample users, an
-organization and three competitions (one per category), run:
+sign in as any user in the database without Google.
 
-```sh
-go run ./cmd/seed
-```
-
-| Sample user | Role |
+| Sample user (from `cmd/seed`) | Role |
 |---|---|
 | Admin User | admin |
 | Olivia Organizer | organizer (owns the sample organization) |
@@ -71,10 +102,11 @@ variables override the file.
 
 | Setting | What it does | Default |
 |---|---|---|
+| `DATABASE_URL` | PostgreSQL connection URL. **Required.** Contains the password, so keep it private | none |
+| `SESSION_SECRET` | Signs the login cookie. **Required.** Use a different value per server | none |
 | `PORT` | Port the server listens on | `4000` |
 | `BASE_URL` | Public address of the site; Google redirects back to `BASE_URL/auth/google/callback` | `http://localhost:4000` |
-| `DB_PATH` | SQLite database file | `./data/arenasuite.db` |
-| `SESSION_SECRET` | Signs the login cookie. **Required.** Use a different value per server | none |
+| `TIMEZONE` | All times on the site are shown and entered in this zone | `Asia/Kolkata` |
 | `SESSION_DAYS` | How long a login lasts | `7` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client (see below) | none |
 | `ALLOWED_EMAIL_DOMAIN` | Only Google accounts on this domain can sign in | `thapar.edu` |
@@ -98,26 +130,24 @@ https, the port, a trailing slash, or `127.0.0.1` vs `localhost`.
 New users land on their **Profile** page first and must enter a roll number
 and branch before using the rest of the site.
 
-## The shared database
+## Sharing a database
 
-The database file `data/arenasuite.db` **is committed to git**, so everyone
-who pulls gets the same data. Keep these in mind:
+The database isn't stored in git. To have everyone on the team see the same
+data, use one **hosted** Postgres (Neon or Supabase) and put its connection
+URL in each person's `.env`. Changes show up for everyone immediately, with
+nothing to commit or merge.
 
-- **Before committing it**, stop the server and run:
-  ```sh
-  sqlite3 data/arenasuite.db "PRAGMA wal_checkpoint(TRUNCATE);"
-  ```
-  While the server runs, SQLite keeps recent changes in `arenasuite.db-wal`
-  (which git ignores). This command moves them into the main file so they
-  actually get committed.
-- **Git can't merge database changes.** If two people both change data and
-  commit, one overwrites the other. Pulling replaces your local data with the
-  version on GitHub. Agree on who commits the database, or commit it rarely.
-- **It contains real student data**: names, emails, roll numbers and branches of
-  everyone who has signed in. Think about this before making the repository
-  public.
-- To start over with an empty database, stop the server and delete the
-  `data/` folder. A fresh database is created on the next start.
+Be careful with the URL:
+
+- **Never commit it.** It contains the password. `.env` is already ignored by
+  git, so share the URL privately (e.g. a direct message).
+- **Don't develop against the live site's database.** One bad test could wipe
+  real student data. Give the team a separate test database instead: on
+  Neon, create a `dev` **branch** (an instant copy) and share that branch's
+  URL; on Supabase, create a second free project. Fill it with
+  `go run ./cmd/seed`.
+- If you'd rather keep your experiments private, use a database on your own
+  computer (Option A or B above).
 
 ## Common commands
 
@@ -126,11 +156,15 @@ who pulls gets the same data. Keep these in mind:
 | Run the server | `go run .` |
 | Add sample data | `go run ./cmd/seed` |
 | Run the tests | `go test ./...` |
+| Open the database in a terminal | `psql "$DATABASE_URL"` (Homebrew: `/opt/homebrew/opt/postgresql@17/bin/psql`) |
+| Start over with an empty local database | `dropdb arenasuite && createdb arenasuite` |
 | Build a single program file | `go build -o arenasuite .` then `./arenasuite` |
-| Build a Docker image | `docker build -t arenasuite .` (database lives in `/data`) |
+| Build a Docker image | `docker build -t arenasuite .` |
 
 **`address already in use`** means another copy is still running. Stop it, or
 change `PORT` in `.env`.
+**`cannot reach the database`** means Postgres isn't running, or
+`DATABASE_URL` is wrong. Check `brew services list` or `docker ps`.
 
 ## Features
 
@@ -157,10 +191,9 @@ change `PORT` in `.env`.
 ```
 main.go                  starts the server
 cmd/seed/                sample data for local testing
-data/arenasuite.db       the shared database (committed)
 internal/
   config/                settings from env / .env
-  db/                    opens SQLite, schema.sql, All/One query helpers
+  db/                    connects to Postgres, schema.sql, query helpers
   app/                   all the rules: permissions, limits, notifications…
   tournament/            pure logic: bracket seeding, round robin, standings (+ tests)
   realtime/              live updates over Server-Sent Events
@@ -174,6 +207,9 @@ web/
 Where to make a change:
 
 - **A rule** ("who can do X", "how many Y"): `internal/app/`
+- **A table or column**: `internal/db/schema.sql`. It only creates missing
+  tables, so a new column on an existing table needs an
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...` line there.
 - **A page's look**: `web/templates/pages/`
 - **Styling**: `web/static/app.css`
 - **A new URL**: `internal/server/server.go` (`routes`)
@@ -184,6 +220,10 @@ Where to make a change:
   templates. Every button is an HTML form that POSTs to an action URL. The
   action calls `internal/app`, sets a one-time message ("Team created") and
   redirects back, so refreshing never re-submits a form.
+- **Database.** Queries are written with `?` placeholders; `internal/db`
+  converts them to Postgres's `$1, $2…` and copies rows into Go structs by
+  their `db:"column"` tags. Times are stored as exact moments (`TIMESTAMPTZ`)
+  and shown in `TIMEZONE`.
 - **Sign-in.** Google's OAuth "authorization code" flow, done entirely on the
   server. The login cookie holds the user id plus an HMAC signature, and the
   user is re-loaded on every request, so suspensions and role changes apply
@@ -203,20 +243,28 @@ Where to make a change:
 
 ## Deploying
 
-The server must run as **one always-on instance with a disk that persists**,
-because the database is a file and live updates are kept in memory.
+You need two things: somewhere to run the app and a hosted Postgres. The app
+must run as **one always-on instance**, because live updates are kept in its
+memory and use long-lived connections.
 
-- **Good fits:** Fly.io (with a volume), Railway or Render (with a persistent
-  disk mounted at `/data`), or any Linux VPS with Caddy in front for HTTPS.
-- **Not suitable:** Vercel, Netlify, AWS Lambda, Google Cloud Run and Heroku.
-  They don't keep files between restarts, and they cut the long connections
-  live updates need.
+| App host | Database | Cost |
+|---|---|---|
+| Render (web service, builds from the `Dockerfile`) | Neon or Supabase | Free tiers exist; Render's free tier sleeps when idle, so the first visit is slow |
+| Railway | Railway Postgres | Paid after trial credit; simplest setup |
+| Fly.io | Fly Postgres or Neon | Paid, small |
+| Google Cloud Run (max instances 1, timeout 60 min) | Neon | Free allowance; needs a billing account |
+| A Linux VPS with Caddy for HTTPS (Oracle Always Free, or GitHub Student Pack credits) | Postgres on the same server, or Neon | Free or cheap |
+
+**Not suitable:** Vercel, Netlify and AWS Lambda. They cut the long
+connections live updates need. Free tiers change often, so check current
+limits.
 
 Before going live:
 
-- Set `BASE_URL=https://your-domain`, a new `SESSION_SECRET`, and `DEV_LOGIN=false`.
+- Set `DATABASE_URL` (the live database, not the dev one), `BASE_URL=https://your-domain`,
+  a new `SESSION_SECRET`, and `DEV_LOGIN=false`.
 - Add `https://your-domain/auth/google/callback` to the Google OAuth client.
-- Back up the database file regularly.
+- Turn on backups in your database provider (or schedule `pg_dump`).
 - **Known issue:** the rate limiter (300 requests/minute per visitor) uses the
   connection's address. Behind a hosting proxy every visitor shares the
   proxy's address, so it needs to read `X-Forwarded-For` first. See

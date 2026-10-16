@@ -1,7 +1,6 @@
 package app
 
 import (
-	"database/sql"
 	"strings"
 
 	"arenasuite/internal/db"
@@ -51,10 +50,14 @@ func (a *App) CreateMatch(user *User, competitionID int64, in MatchInput) error 
 	if strings.TrimSpace(in.Round) == "" {
 		return fail(400, "Round is required")
 	}
-	_, err := a.DB.Exec(`
+	scheduledAt, err := db.LocalTime(in.ScheduledAt)
+	if err != nil {
+		return fail(400, "Please enter a valid date and time")
+	}
+	_, err = a.DB.Exec(`
 		INSERT INTO matches (competition_id, round, round_order, team_a_id, team_b_id, scheduled_at, venue)
 		VALUES (?, ?, 0, ?, ?, ?, ?)`,
-		competitionID, in.Round, db.NullIfZero(in.TeamAID), db.NullIfZero(in.TeamBID), db.NullIfEmpty(in.ScheduledAt), db.NullIfEmpty(in.Venue))
+		competitionID, in.Round, db.NullIfZero(in.TeamAID), db.NullIfZero(in.TeamBID), scheduledAt, db.NullIfEmpty(in.Venue))
 	if err == nil {
 		a.toCompetition(competitionID, "matchStatusUpdated", map[string]int64{"competitionId": competitionID})
 	}
@@ -71,7 +74,7 @@ func (a *App) GenerateFixtures(user *User, competitionID int64, regenerate bool)
 		return err
 	}
 
-	err = a.inTx(func(tx *sql.Tx) error {
+	err = a.inTx(func(tx *db.Tx) error {
 		existing, err := db.Count(tx, `SELECT COUNT(*) FROM matches WHERE competition_id = ?`, competitionID)
 		if err != nil {
 			return err
@@ -119,14 +122,14 @@ func (a *App) GenerateFixtures(user *User, competitionID int64, regenerate bool)
 		for r, round := range rounds {
 			ids[r] = make([]int64, len(round))
 			for i, f := range round {
-				res, err := tx.Exec(`
+				newID, err := db.Insert(tx, `
 					INSERT INTO matches (competition_id, round, round_order, team_a_id, team_b_id, winner_id)
 					VALUES (?, ?, ?, ?, ?, ?)`,
 					competitionID, f.Round, f.RoundOrder, db.NullIfZero(f.TeamA), db.NullIfZero(f.TeamB), db.NullIfZero(f.Winner))
 				if err != nil {
 					return err
 				}
-				ids[r][i], _ = res.LastInsertId()
+				ids[r][i] = newID
 			}
 		}
 		// ...then link each knockout match to the next-round slot it feeds.
@@ -176,6 +179,10 @@ func (a *App) UpdateMatch(user *User, matchID int64, in MatchUpdate) (competitio
 	if err := mustBeOneOf(in.Status, MatchStatuses, "status"); err != nil {
 		return 0, err
 	}
+	scheduledAt, err := db.LocalTime(in.ScheduledAt)
+	if err != nil {
+		return 0, fail(400, "Please enter a valid date and time")
+	}
 
 	winner := m.WinnerID
 	if in.Status == "completed" && in.ScoreA != nil && in.ScoreB != nil {
@@ -189,11 +196,11 @@ func (a *App) UpdateMatch(user *User, matchID int64, in MatchUpdate) (competitio
 		}
 	}
 
-	err = a.inTx(func(tx *sql.Tx) error {
+	err = a.inTx(func(tx *db.Tx) error {
 		_, err := tx.Exec(`
 			UPDATE matches SET score_a = ?, score_b = ?, status = ?, winner_id = ?, scheduled_at = ?, venue = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?`,
-			in.ScoreA, in.ScoreB, in.Status, db.NullIfZero(winner), db.NullIfEmpty(in.ScheduledAt), db.NullIfEmpty(in.Venue), matchID)
+			in.ScoreA, in.ScoreB, in.Status, db.NullIfZero(winner), scheduledAt, db.NullIfEmpty(in.Venue), matchID)
 		if err != nil {
 			return err
 		}

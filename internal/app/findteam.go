@@ -15,7 +15,7 @@ type FindTeamFilter struct {
 
 // RecruitingTeams lists teams that are looking for members.
 func (a *App) RecruitingTeams(f FindTeamFilter) ([]Team, error) {
-	where := []string{"t.status = 'active'", "t.looking_for_members = 1"}
+	where := []string{"t.status = 'active'", "t.looking_for_members"}
 	var args []any
 	if f.CompetitionID != 0 {
 		where = append(where, "t.competition_id = ?")
@@ -26,7 +26,7 @@ func (a *App) RecruitingTeams(f FindTeamFilter) ([]Team, error) {
 		args = append(args, f.Category)
 	}
 	if f.Role != "" {
-		where = append(where, "(t.looking_for_role LIKE ? OR t.required_skills LIKE ?)")
+		where = append(where, "(t.looking_for_role ILIKE ? OR t.required_skills ILIKE ?)")
 		args = append(args, "%"+f.Role+"%", "%"+f.Role+"%")
 	}
 	return db.All[Team](a.DB, teamSelect+" WHERE "+strings.Join(where, " AND ")+" ORDER BY t.created_at DESC", args...)
@@ -51,7 +51,7 @@ func (a *App) OpenPosts(f FindTeamFilter) ([]Post, error) {
 		args = append(args, f.Category)
 	}
 	if f.Role != "" {
-		where = append(where, "(p.role LIKE ? OR p.skills LIKE ?)")
+		where = append(where, "(p.role ILIKE ? OR p.skills ILIKE ?)")
 		args = append(args, "%"+f.Role+"%", "%"+f.Role+"%")
 	}
 	return db.All[Post](a.DB, postSelect+" WHERE "+strings.Join(where, " AND ")+" ORDER BY p.created_at DESC", args...)

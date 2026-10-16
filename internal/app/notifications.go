@@ -7,7 +7,7 @@ func (a *App) NotificationsFor(userID int64) ([]Notification, error) {
 }
 
 func (a *App) UnreadCount(userID int64) int64 {
-	n, _ := db.Count(a.DB, `SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0`, userID)
+	n, _ := db.Count(a.DB, `SELECT COUNT(*) FROM notifications WHERE user_id = ? AND NOT is_read`, userID)
 	return n
 }
 
@@ -22,11 +22,11 @@ func (a *App) MarkRead(user *User, notificationID int64) error {
 	if n.UserID != user.ID {
 		return fail(403, "This notification does not belong to you")
 	}
-	_, err = a.DB.Exec(`UPDATE notifications SET is_read = 1 WHERE id = ?`, notificationID)
+	_, err = a.DB.Exec(`UPDATE notifications SET is_read = TRUE WHERE id = ?`, notificationID)
 	return err
 }
 
 func (a *App) MarkAllRead(user *User) error {
-	_, err := a.DB.Exec(`UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`, user.ID)
+	_, err := a.DB.Exec(`UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND NOT is_read`, user.ID)
 	return err
 }

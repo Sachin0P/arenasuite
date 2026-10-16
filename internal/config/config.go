@@ -12,9 +12,10 @@ import (
 )
 
 type Config struct {
-	Port    string // HTTP port to listen on
-	BaseURL string // public URL of the site, used to build the Google redirect URL
-	DBPath  string // SQLite file location
+	Port        string // HTTP port to listen on
+	BaseURL     string // public URL of the site, used to build the Google redirect URL
+	DatabaseURL string // Postgres connection URL
+	Timezone    string // times are shown and entered in this zone, e.g. "Asia/Kolkata"
 
 	SessionSecret string        // signs the login cookie
 	SessionTTL    time.Duration // how long a login lasts
@@ -42,7 +43,8 @@ func Load() Config {
 	cfg := Config{
 		Port:               port,
 		BaseURL:            strings.TrimRight(get("BASE_URL", "http://localhost:"+port), "/"),
-		DBPath:             get("DB_PATH", "./data/arenasuite.db"),
+		DatabaseURL:        get("DATABASE_URL", ""),
+		Timezone:           get("TIMEZONE", "Asia/Kolkata"),
 		SessionSecret:      get("SESSION_SECRET", ""),
 		SessionTTL:         time.Duration(days) * 24 * time.Hour,
 		GoogleClientID:     get("GOOGLE_CLIENT_ID", ""),

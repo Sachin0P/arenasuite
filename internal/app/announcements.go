@@ -23,12 +23,11 @@ func (a *App) CreateAnnouncement(user *User, competitionID int64, title, message
 	if strings.TrimSpace(title) == "" || strings.TrimSpace(message) == "" {
 		return fail(400, "Title and message are required")
 	}
-	res, err := a.DB.Exec(`INSERT INTO announcements (competition_id, title, message, created_by) VALUES (?, ?, ?, ?)`,
+	id, err := db.Insert(a.DB, `INSERT INTO announcements (competition_id, title, message, created_by) VALUES (?, ?, ?, ?)`,
 		competitionID, title, message, user.ID)
 	if err != nil {
 		return err
 	}
-	id, _ := res.LastInsertId()
 
 	if ann, _ := db.One[Announcement](a.DB, `SELECT * FROM announcements WHERE id = ?`, id); ann != nil {
 		a.toCompetition(competitionID, "announcementCreated", map[string]any{"id": ann.ID, "title": ann.Title})

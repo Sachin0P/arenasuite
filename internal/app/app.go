@@ -4,7 +4,6 @@
 package app
 
 import (
-	"database/sql"
 	"fmt"
 	"slices"
 
@@ -14,7 +13,7 @@ import (
 )
 
 type App struct {
-	DB  *sql.DB
+	DB  *db.DB
 	Hub *realtime.Hub
 	Cfg config.Config
 }
@@ -50,7 +49,7 @@ func mustBeOneOf(value string, allowed []string, field string) error {
 
 // inTx runs fn inside a transaction: everything is saved if fn returns nil,
 // and nothing is saved if it returns an error.
-func (a *App) inTx(fn func(tx *sql.Tx) error) error {
+func (a *App) inTx(fn func(tx *db.Tx) error) error {
 	tx, err := a.DB.Begin()
 	if err != nil {
 		return err
@@ -65,13 +64,12 @@ func (a *App) inTx(fn func(tx *sql.Tx) error) error {
 // Notify saves a notification for a user and pushes it live to any open tab,
 // so it shows up now and is still there if they weren't online.
 func (a *App) Notify(userID int64, kind, message string, referenceID int64) {
-	res, err := a.DB.Exec(
+	id, err := db.Insert(a.DB,
 		`INSERT INTO notifications (user_id, type, message, reference_id) VALUES (?, ?, ?, ?)`,
 		userID, kind, message, db.NullIfZero(referenceID))
 	if err != nil {
 		return
 	}
-	id, _ := res.LastInsertId()
 	if n, _ := db.One[Notification](a.DB, `SELECT * FROM notifications WHERE id = ?`, id); n != nil {
 		a.Hub.Send(realtime.UserRoom(userID), "notification", n)
 	}

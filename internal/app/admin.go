@@ -60,7 +60,7 @@ func (a *App) SearchUsers(role, status, q string) ([]User, error) {
 		args = append(args, status)
 	}
 	if q != "" {
-		where = append(where, "(name LIKE ? OR email LIKE ?)")
+		where = append(where, "(name ILIKE ? OR email ILIKE ?)")
 		args = append(args, "%"+q+"%", "%"+q+"%")
 	}
 	return db.All[User](a.DB, `SELECT * FROM users WHERE `+strings.Join(where, " AND ")+` ORDER BY created_at DESC`, args...)
@@ -95,7 +95,7 @@ func (a *App) updateUser(userID int64, query, value string) error {
 }
 
 func (a *App) VerifyOrganization(orgID int64) error {
-	res, err := a.DB.Exec(`UPDATE organizations SET verified = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, orgID)
+	res, err := a.DB.Exec(`UPDATE organizations SET verified = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, orgID)
 	if err != nil {
 		return err
 	}

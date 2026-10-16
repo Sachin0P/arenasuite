@@ -1,0 +1,8 @@
+.env
+# Old SQLite database files from before the switch to PostgreSQL
+data/
+*.db
+*.db-wal
+*.db-shm
+/arenasuite
+.DS_Store
