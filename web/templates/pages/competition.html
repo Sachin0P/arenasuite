@@ -68,7 +68,7 @@
         {{if eq $c.Category "ACADEMIC"}}Stages: {{join $c.Stages " → "}}{{else}}Format: {{label $c.Format}}{{end}}
         {{with $c.Type}} · Type: {{.}}{{end}}
         {{with $c.MaxTeams}} · Max teams: {{.}}{{end}}
-        {{with $c.MaxParticipants}} · Max participants: {{.}}{{end}}
+        {{with $c.MaxTeamSize}} · Max {{.}} people per team{{end}}
       </p>
       {{if $.User}}
       <details>
@@ -88,8 +88,8 @@
         <button type="button" class="btn btn-primary btn-sm mb" data-reveal="#new-team">+ Create Team</button>
         <form method="post" action="/competitions/{{$c.ID}}/teams" id="new-team" class="card stack mb" hidden>
           <div class="grid form">
-            <input name="name" placeholder="Team name" required>
-            <input name="maxMembers" type="number" min="1" value="4" placeholder="Max members">
+            <label class="field"><span>Team name</span><input name="name" required></label>
+            <label class="field"><span>Max members{{with $c.MaxTeamSize}} (up to {{.}}){{end}}</span><input name="maxMembers" type="number" min="1" {{with $c.MaxTeamSize}}max="{{.}}"{{end}} value="{{or $c.MaxTeamSize 4}}"></label>
           </div>
           <textarea name="description" rows="2" placeholder="Description (optional)"></textarea>
           <label class="check"><input type="checkbox" name="lookingForMembers" data-toggle="#new-team-looking"> Looking for members</label>

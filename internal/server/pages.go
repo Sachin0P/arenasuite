@@ -239,7 +239,7 @@ func (s *Server) organizePage(w http.ResponseWriter, r *http.Request) {
 // ---------- signed-in pages ----------
 
 func (s *Server) profilePage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, http.StatusOK, "profile", "Profile", nil)
+	s.render(w, r, http.StatusOK, "profile", "Profile", map[string]any{"DefaultCollege": s.app.Cfg.DefaultCollege})
 }
 
 func (s *Server) saveProfile(w http.ResponseWriter, r *http.Request) {

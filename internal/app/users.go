@@ -51,8 +51,9 @@ func (a *App) LoginWithGoogle(g *auth.GoogleUser) (*User, error) {
 	if isBootstrapAdmin {
 		role = "admin"
 	}
-	res, err := a.DB.Exec(`INSERT INTO users (google_id, name, email, profile_picture, role) VALUES (?, ?, ?, ?, ?)`,
-		g.Sub, g.Name, email, db.NullIfEmpty(g.Picture), role)
+	// Everyone signing in is from the same college, so fill it in for them.
+	res, err := a.DB.Exec(`INSERT INTO users (google_id, name, email, profile_picture, role, college) VALUES (?, ?, ?, ?, ?, ?)`,
+		g.Sub, g.Name, email, db.NullIfEmpty(g.Picture), role, db.NullIfEmpty(a.Cfg.DefaultCollege))
 	if err != nil {
 		return nil, err
 	}

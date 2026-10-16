@@ -83,7 +83,7 @@ func (s *Server) editCompetitionPage(w http.ResponseWriter, r *http.Request) {
 		OrganizationID: c.OrganizationID, Name: c.Name, Description: c.Description, Category: c.Category,
 		Type: c.Type, Banner: c.Banner, StartDate: c.StartDate, EndDate: c.EndDate,
 		RegistrationDeadline: c.RegistrationDeadline, Venue: c.Venue, Mode: c.Mode,
-		MaxParticipants: c.MaxParticipants, MaxTeams: c.MaxTeams, RegistrationFee: c.RegistrationFee,
+		MaxTeamSize: c.MaxTeamSize, MaxTeams: c.MaxTeams, RegistrationFee: c.RegistrationFee,
 		Rules: c.Rules, Format: c.Format, Stages: c.Stages(),
 	}
 	s.competitionForm(w, r, http.StatusOK, in, c.ID, "")
@@ -128,7 +128,7 @@ func readCompetitionForm(r *http.Request) app.CompetitionInput {
 		RegistrationDeadline: formText(r, "registrationDeadline"),
 		Venue:                formText(r, "venue"),
 		Mode:                 formText(r, "mode"),
-		MaxParticipants:      formInt(r, "maxParticipants"),
+		MaxTeamSize:          formInt(r, "maxTeamSize"),
 		MaxTeams:             formInt(r, "maxTeams"),
 		RegistrationFee:      fee,
 		Rules:                formText(r, "rules"),

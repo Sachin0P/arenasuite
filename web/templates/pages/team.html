@@ -7,7 +7,7 @@
     <div class="row between mt">
       <div>
         <h1>{{$t.Name}}</h1>
-        <p class="small muted">Captain: {{$t.CaptainName}} · {{$t.MemberCount}}/{{$t.MaxMembers}} members</p>
+        <p class="small muted">Captain: {{$t.CaptainName}} · {{$t.MemberCount}}/{{$t.Capacity}} members</p>
       </div>
       {{if $d.IsCaptain}}<button type="button" class="btn btn-sm" data-reveal="#edit-team">Edit Team</button>{{end}}
     </div>
@@ -22,7 +22,7 @@
     <label class="field"><span>Team name</span><input name="name" value="{{$t.Name}}" required></label>
     <label class="field"><span>Description</span><textarea name="description" rows="2">{{$t.Description}}</textarea></label>
     <div class="grid form">
-      <label class="field"><span>Max members</span><input name="maxMembers" type="number" min="1" value="{{$t.MaxMembers}}"></label>
+      <label class="field"><span>Max members{{with $t.MaxTeamSize}} (up to {{.}}){{end}}</span><input name="maxMembers" type="number" min="1" {{with $t.MaxTeamSize}}max="{{.}}"{{end}} value="{{$t.Capacity}}"></label>
       <label class="check"><input type="checkbox" name="lookingForMembers" data-toggle="#edit-looking" {{if $t.LookingForMembers}}checked{{end}}> Looking for members</label>
     </div>
     <div class="grid form" id="edit-looking">

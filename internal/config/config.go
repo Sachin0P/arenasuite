@@ -22,6 +22,7 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	AllowedEmailDomain string   // only this Google domain may sign in, e.g. "thapar.edu"
+	DefaultCollege     string   // pre-filled college for new users, e.g. "Thapar University"
 	AdminEmails        []string // emails promoted to admin on login (one-way bootstrap)
 
 	// DevLogin shows a "sign in as any user" list on the login page.
@@ -47,6 +48,7 @@ func Load() Config {
 		GoogleClientID:     get("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: get("GOOGLE_CLIENT_SECRET", ""),
 		AllowedEmailDomain: strings.ToLower(get("ALLOWED_EMAIL_DOMAIN", "thapar.edu")),
+		DefaultCollege:     get("DEFAULT_COLLEGE", "Thapar University"),
 		DevLogin:           get("DEV_LOGIN", "false") == "true",
 	}
 	for _, e := range strings.Split(get("ADMIN_EMAILS", ""), ",") {

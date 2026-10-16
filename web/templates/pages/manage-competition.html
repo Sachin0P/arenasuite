@@ -62,7 +62,7 @@
         {{range $d.Teams}}
         <a href="/teams/{{.ID}}" class="card">
           <b>{{.Name}}</b>
-          <p class="tiny-text muted">Captain: {{.CaptainName}} · {{.MemberCount}}/{{.MaxMembers}} members</p>
+          <p class="tiny-text muted">Captain: {{.CaptainName}} · {{.MemberCount}}/{{.Capacity}} members</p>
         </a>
         {{end}}
       </div>

@@ -57,8 +57,8 @@ type Competition struct {
 	EndDate              string  `db:"end_date"`
 	RegistrationDeadline string  `db:"registration_deadline"`
 	Venue                string  `db:"venue"`
-	Mode                 string  `db:"mode"` // online | offline
-	MaxParticipants      int64   `db:"max_participants"`
+	Mode                 string  `db:"mode"`             // online | offline
+	MaxTeamSize          int64   `db:"max_participants"` // max people per team (0 = no limit)
 	MaxTeams             int64   `db:"max_teams"`
 	RegistrationFee      float64 `db:"registration_fee"`
 	Rules                string  `db:"rules"`
@@ -76,15 +76,15 @@ type Competition struct {
 	TeamsCount         int64  `db:"teams_count"`
 }
 
-func (c *Competition) IsKnockout() bool { return tournament.IsKnockout(c.Format) }
+func (c Competition) IsKnockout() bool { return tournament.IsKnockout(c.Format) }
 
 // RegistrationOpen: published and the deadline hasn't passed yet.
-func (c *Competition) RegistrationOpen() bool {
+func (c Competition) RegistrationOpen() bool {
 	return c.Status == "published" && c.RegistrationDeadline >= nowLocal()
 }
 
 // Stages returns the Academic stage names stored as a JSON array.
-func (c *Competition) Stages() []string {
+func (c Competition) Stages() []string {
 	var stages []string
 	json.Unmarshal([]byte(c.StagesJSON), &stages)
 	return stages
@@ -108,14 +108,24 @@ type Team struct {
 	MemberCount     int64  `db:"member_count"`
 	CompetitionName string `db:"competition_name"`
 	Category        string `db:"category"`
+	MaxTeamSize     int64  `db:"competition_max_team_size"` // the competition's limit, 0 = none
 
 	Members []TeamMember // only filled by TeamByID
 }
 
-func (t *Team) IsFull() bool { return t.MemberCount >= t.MaxMembers }
+// Capacity is how many people the team can hold: its own size, capped by the
+// competition's limit (in case the organizer lowered it after the team formed).
+func (t Team) Capacity() int64 {
+	if t.MaxTeamSize > 0 && t.MaxTeamSize < t.MaxMembers {
+		return t.MaxTeamSize
+	}
+	return t.MaxMembers
+}
+
+func (t Team) IsFull() bool { return t.MemberCount >= t.Capacity() }
 
 // HasMember reports whether a user is an active member (needs Members loaded).
-func (t *Team) HasMember(userID int64) bool {
+func (t Team) HasMember(userID int64) bool {
 	for _, m := range t.Members {
 		if m.UserID == userID {
 			return true

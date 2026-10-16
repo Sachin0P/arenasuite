@@ -54,7 +54,7 @@
         </div>
         <div class="grid form">
           <label class="field"><span>Max teams</span><input type="number" min="0" name="maxTeams" value="{{if $f.MaxTeams}}{{$f.MaxTeams}}{{end}}"></label>
-          <label class="field"><span>Max participants</span><input type="number" min="0" name="maxParticipants" value="{{if $f.MaxParticipants}}{{$f.MaxParticipants}}{{end}}"></label>
+          <label class="field"><span>Max people per team</span><input type="number" min="1" name="maxTeamSize" value="{{if $f.MaxTeamSize}}{{$f.MaxTeamSize}}{{end}}" placeholder="No limit"></label>
           <label class="field"><span>Registration fee (₹)</span><input type="number" min="0" step="1" name="registrationFee" value="{{$f.RegistrationFee}}"></label>
         </div>
         <label class="field"><span>Rules</span><textarea name="rules" rows="4">{{$f.Rules}}</textarea></label>

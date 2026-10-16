@@ -165,7 +165,7 @@ type CompetitionInput struct {
 	Name, Description, Category, Type, Banner string
 	StartDate, EndDate, RegistrationDeadline  string
 	Venue, Mode                               string
-	MaxParticipants, MaxTeams                 int64
+	MaxTeamSize, MaxTeams                     int64
 	RegistrationFee                           float64
 	Rules, Format                             string
 	Stages                                    []string // Academic only
@@ -191,6 +191,9 @@ func (in *CompetitionInput) validate() error {
 	}
 	if in.Mode != "online" {
 		in.Mode = "offline"
+	}
+	if in.MaxTeamSize < 0 || in.MaxTeams < 0 || in.RegistrationFee < 0 {
+		return fail(400, "Limits and fee can't be negative")
 	}
 	if in.EndDate < in.StartDate {
 		return fail(400, "End date must be after the start date")
@@ -232,7 +235,7 @@ func (a *App) CreateCompetition(user *User, in CompetitionInput) (int64, error) 
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		in.OrganizationID, in.Name, db.NullIfEmpty(in.Description), in.Category, db.NullIfEmpty(in.Type), db.NullIfEmpty(in.Banner),
 		in.StartDate, in.EndDate, in.RegistrationDeadline, db.NullIfEmpty(in.Venue), in.Mode,
-		db.NullIfZero(in.MaxParticipants), db.NullIfZero(in.MaxTeams), in.RegistrationFee, db.NullIfEmpty(in.Rules), in.Format, in.stagesJSON(),
+		db.NullIfZero(in.MaxTeamSize), db.NullIfZero(in.MaxTeams), in.RegistrationFee, db.NullIfEmpty(in.Rules), in.Format, in.stagesJSON(),
 		status, user.ID)
 	if err != nil {
 		return 0, err
@@ -258,7 +261,7 @@ func (a *App) UpdateCompetition(user *User, id int64, in CompetitionInput) error
 		WHERE id = ?`,
 		in.Name, db.NullIfEmpty(in.Description), in.Category, db.NullIfEmpty(in.Type), db.NullIfEmpty(in.Banner),
 		in.StartDate, in.EndDate, in.RegistrationDeadline, db.NullIfEmpty(in.Venue), in.Mode,
-		db.NullIfZero(in.MaxParticipants), db.NullIfZero(in.MaxTeams), in.RegistrationFee, db.NullIfEmpty(in.Rules), in.Format, in.stagesJSON(),
+		db.NullIfZero(in.MaxTeamSize), db.NullIfZero(in.MaxTeams), in.RegistrationFee, db.NullIfEmpty(in.Rules), in.Format, in.stagesJSON(),
 		id)
 	return err
 }

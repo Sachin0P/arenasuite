@@ -39,9 +39,9 @@ func main() {
 		// Seed users get a roll number and branch so they skip onboarding.
 		_, err := conn.Exec(`
 			INSERT INTO users (google_id, name, email, role, college, roll_number, branch)
-			VALUES (?, ?, ?, ?, 'Thapar Institute', ?, 'Computer Engineering')
+			VALUES (?, ?, ?, ?, ?, ?, 'Computer Engineering')
 			ON CONFLICT (google_id) DO UPDATE SET name = excluded.name, role = excluded.role`,
-			u.googleID, u.name, u.email, u.role, fmt.Sprintf("10230300%d", i+1))
+			u.googleID, u.name, u.email, u.role, cfg.DefaultCollege, fmt.Sprintf("10230300%d", i+1))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -56,8 +56,8 @@ func main() {
 	conn.QueryRow(`SELECT id FROM organizations WHERE name = 'Thapar Sports & Tech Club'`).Scan(&orgID)
 	if orgID == 0 {
 		res, err := conn.Exec(`INSERT INTO organizations (name, description, college, verified, created_by)
-			VALUES ('Thapar Sports & Tech Club', 'Runs the campus leagues, hackathons and LAN nights.', 'Thapar Institute', 1, ?)`,
-			ids["seed-organizer"])
+			VALUES ('Thapar Sports & Tech Club', 'Runs the campus leagues, hackathons and LAN nights.', ?, 1, ?)`,
+			cfg.DefaultCollege, ids["seed-organizer"])
 		if err != nil {
 			log.Fatal(err)
 		}

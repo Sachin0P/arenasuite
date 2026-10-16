@@ -9,6 +9,7 @@ import (
 
 const teamSelect = `
 	SELECT t.*, u.name AS captain_name, c.name AS competition_name, c.category,
+		c.max_participants AS competition_max_team_size,
 		(SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id AND m.status = 'active') AS member_count
 	FROM teams t
 	JOIN users u ON u.id = t.captain_id
@@ -87,8 +88,15 @@ func (a *App) CreateTeam(user *User, competitionID int64, in TeamInput) (int64, 
 	if c.Status != "published" && c.Status != "ongoing" {
 		return 0, fail(400, "Teams can only be created for published competitions")
 	}
+	// Default team size: the competition's limit if it has one, otherwise 4.
+	if in.MaxMembers <= 0 {
+		in.MaxMembers = c.MaxTeamSize
+	}
 	if in.MaxMembers <= 0 {
 		in.MaxMembers = 4
+	}
+	if err := checkTeamSize(in.MaxMembers, c.MaxTeamSize, 1); err != nil {
+		return 0, err
 	}
 
 	var id int64
@@ -127,6 +135,9 @@ func (a *App) UpdateTeam(user *User, teamID int64, in TeamInput) error {
 	if in.MaxMembers <= 0 {
 		in.MaxMembers = t.MaxMembers
 	}
+	if err := checkTeamSize(in.MaxMembers, t.MaxTeamSize, t.MemberCount); err != nil {
+		return err
+	}
 	_, err = a.DB.Exec(`
 		UPDATE teams SET name = ?, description = ?, max_members = ?, required_skills = ?,
 			looking_for_members = ?, looking_for_role = ?, updated_at = CURRENT_TIMESTAMP
@@ -137,6 +148,18 @@ func (a *App) UpdateTeam(user *User, teamID int64, in TeamInput) error {
 		return fail(409, "A team with this name already exists in this competition")
 	}
 	return err
+}
+
+// checkTeamSize makes sure a team's size fits the competition's limit
+// (0 = no limit) and isn't smaller than the members it already has.
+func checkTeamSize(size, limit, currentMembers int64) error {
+	if limit > 0 && size > limit {
+		return fail(400, "Teams in this competition can have at most %d members", limit)
+	}
+	if size < currentMembers {
+		return fail(400, "This team already has %d members", currentMembers)
+	}
+	return nil
 }
 
 // DeleteTeam disbands a team. Its registration goes too (ON DELETE CASCADE).
