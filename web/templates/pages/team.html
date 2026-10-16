@@ -75,7 +75,7 @@
   </section>
   {{end}}
 
-  {{if and $.User (not $d.IsMember) $t.LookingForMembers}}
+  {{if and $.User (not $d.IsMember) $t.LookingForMembers (not ($t.OrganizedBy $.User))}}
     {{if $d.MyRequestID}}
       <form method="post" action="/join-requests/{{$d.MyRequestID}}/cancel"><button class="btn">Request sent · Withdraw</button></form>
     {{else if not $t.IsFull}}

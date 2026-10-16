@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"arenasuite/internal/db"
@@ -8,11 +9,12 @@ import (
 
 const teamSelect = `
 	SELECT t.*, u.name AS captain_name, c.name AS competition_name, c.category,
-		c.max_participants AS competition_max_team_size,
+		c.max_participants AS competition_max_team_size, o.created_by AS competition_organizer_id,
 		(SELECT COUNT(*) FROM team_members m WHERE m.team_id = t.id AND m.status = 'active') AS member_count
 	FROM teams t
 	JOIN users u ON u.id = t.captain_id
-	JOIN competitions c ON c.id = t.competition_id`
+	JOIN competitions c ON c.id = t.competition_id
+	JOIN organizations o ON o.id = c.organization_id`
 
 func (a *App) getTeam(q db.Querier, id int64) (*Team, error) {
 	t, err := db.One[Team](q, teamSelect+` WHERE t.id = ?`, id)
@@ -82,6 +84,9 @@ func (a *App) CreateTeam(user *User, competitionID int64, in TeamInput) (int64, 
 	}
 	c, err := a.getCompetition(a.DB, competitionID)
 	if err != nil {
+		return 0, err
+	}
+	if err := mustNotOrganize(user, c); err != nil {
 		return 0, err
 	}
 	if c.Status != "published" && c.Status != "ongoing" {
@@ -240,6 +245,30 @@ func (a *App) TransferCaptain(user *User, teamID, newCaptainID int64) error {
 	})
 }
 
+// createSoloTeam makes a one-person team named after the user, with them as
+// captain, and returns its id. If the name is taken in this competition a
+// number is added: "Priya Sharma (2)".
+func createSoloTeam(tx *db.Tx, competitionID int64, user *User) (int64, error) {
+	name := user.Name
+	for i := 2; ; i++ {
+		taken, err := db.Count(tx, `SELECT COUNT(*) FROM teams WHERE competition_id = ? AND name = ?`, competitionID, name)
+		if err != nil {
+			return 0, err
+		}
+		if taken == 0 {
+			break
+		}
+		name = fmt.Sprintf("%s (%d)", user.Name, i)
+	}
+	id, err := db.Insert(tx, `INSERT INTO teams (competition_id, name, captain_id, max_members) VALUES (?, ?, ?, 1)`,
+		competitionID, name, user.ID)
+	if err != nil {
+		return 0, err
+	}
+	_, err = tx.Exec(`INSERT INTO team_members (team_id, user_id, role, status) VALUES (?, ?, 'captain', 'active')`, id, user.ID)
+	return id, err
+}
+
 // addMember adds (or re-activates) a user on a team. Someone who left or was
 // removed earlier already has a row, which we switch back to active.
 func addMember(q db.Querier, teamID, userID int64) error {
@@ -256,6 +285,9 @@ func (a *App) RequestToJoin(user *User, teamID int64, message string) error {
 	t, err := a.getTeam(a.DB, teamID)
 	if err != nil {
 		return err
+	}
+	if t.OrganizedBy(user) {
+		return fail(403, organizerMsg)
 	}
 	if !t.LookingForMembers {
 		return fail(400, "This team is not looking for members")
@@ -378,6 +410,9 @@ func (a *App) InviteMember(user *User, teamID, inviteeID int64) error {
 	if err := mustBeCaptain(user, t); err != nil {
 		return err
 	}
+	if t.OrganizerID == inviteeID {
+		return fail(403, "That person is organizing this competition, so they can't join a team in it")
+	}
 	if t.IsFull() {
 		return fail(400, "This team is full")
 	}
@@ -431,6 +466,9 @@ func (a *App) RespondInvitation(user *User, invitationID int64, accept bool) err
 	err = a.inTx(func(tx *db.Tx) error {
 		if accept {
 			status, verb = "accepted", "accepted"
+			if t.OrganizedBy(user) {
+				return fail(403, organizerMsg)
+			}
 			if t.IsFull() {
 				return fail(400, "This team is full")
 			}

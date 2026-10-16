@@ -34,22 +34,29 @@
             </form>
           {{end}}
         </div>
+      {{else if $c.OrganizedBy $.User}}
+        <p class="small muted">You're organizing this competition, so you can't take part in it.</p>
       {{else if not $c.RegistrationOpen}}
         <p class="small muted">Registration is closed for this competition.</p>
+      {{else if $d.CaptainOf}}
+        <div class="row">
+          {{range $d.CaptainOf}}
+            <form method="post" action="/competitions/{{$c.ID}}/register" class="inline">
+              <input type="hidden" name="teamId" value="{{.ID}}">
+              <button class="btn btn-primary">Register "{{.Name}}"</button>
+            </form>
+          {{end}}
+        </div>
+      {{else if $d.OnTeam}}
+        <p class="small muted">You're on a team in this competition. Your team's captain registers the team.</p>
       {{else}}
         <div class="row">
           <form method="post" action="/competitions/{{$c.ID}}/register" class="inline">
             <button class="btn btn-primary">Register Individually</button>
           </form>
-          {{range $d.CaptainOf}}
-            <form method="post" action="/competitions/{{$c.ID}}/register" class="inline">
-              <input type="hidden" name="teamId" value="{{.ID}}">
-              <button class="btn">Register "{{.Name}}"</button>
-            </form>
-          {{else}}
-            {{if not $d.OnTeam}}<a href="#teams" class="btn">Create / Join a Team</a>{{end}}
-          {{end}}
+          <a href="#teams" class="btn">Create / Join a Team</a>
         </div>
+        <p class="tiny-text muted mt">Registering individually creates a one-person team for you.</p>
       {{end}}
     </div>
 
@@ -84,7 +91,7 @@
     </section>
 
     <section class="tab-panel" id="tab-teams">
-      {{if and $.User (not $d.OnTeam) (or (eq $c.Status "published") (eq $c.Status "ongoing"))}}
+      {{if and $.User (not $d.OnTeam) (not ($c.OrganizedBy $.User)) (or (eq $c.Status "published") (eq $c.Status "ongoing"))}}
         <button type="button" class="btn btn-primary btn-sm mb" data-reveal="#new-team">+ Create Team</button>
         <form method="post" action="/competitions/{{$c.ID}}/teams" id="new-team" class="card stack mb" hidden>
           <div class="grid form">

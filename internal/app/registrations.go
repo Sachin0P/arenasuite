@@ -20,41 +20,42 @@ func (a *App) getRegistration(id int64) (*Registration, error) {
 	return r, err
 }
 
-// Register signs the user up for a competition: individually when teamID is
-// 0, otherwise on behalf of a team they captain. It starts as "pending" until
+// Register signs a team up for a competition. It starts as "pending" until
 // the organizer approves it, so the organizer is notified.
+//
+// teamID 0 means "Register Individually": the user gets a one-person team
+// (named after them, with them as captain), which is then registered like any
+// other team. That way solo players show up in the team list and fixtures.
 func (a *App) Register(user *User, competitionID, teamID int64) error {
 	c, err := a.getCompetition(a.DB, competitionID)
 	if err != nil {
+		return err
+	}
+	if err := mustNotOrganize(user, c); err != nil {
 		return err
 	}
 	if !c.RegistrationOpen() {
 		return fail(400, "Registration is closed for this competition")
 	}
 
+	solo := teamID == 0
 	who := user.Name
 	err = a.inTx(func(tx *db.Tx) error {
+		if solo {
+			if err := mustNotBeOnTeam(tx, competitionID, user.ID,
+				"You're already on a team in this competition, so register with that team instead"); err != nil {
+				return err
+			}
+			var err error
+			if teamID, err = createSoloTeam(tx, competitionID, user); err != nil {
+				return err
+			}
+		}
+
 		// A cancelled registration shouldn't block signing up again, so clear
 		// it out first (the table allows one row per user / team).
 		if _, err := tx.Exec(`DELETE FROM registrations WHERE competition_id = ? AND status = 'cancelled' AND (user_id = ? OR team_id = ?)`,
-			competitionID, user.ID, db.NullIfZero(teamID)); err != nil {
-			return err
-		}
-
-		if teamID == 0 {
-			// Blocked if they registered before, or a team they're on did.
-			n, err := db.Count(tx, `
-				SELECT COUNT(*) FROM registrations
-				WHERE competition_id = ? AND status != 'cancelled'
-				  AND (user_id = ? OR team_id IN (SELECT team_id FROM team_members WHERE user_id = ? AND status = 'active'))`,
-				competitionID, user.ID, user.ID)
-			if err != nil {
-				return err
-			}
-			if n > 0 {
-				return fail(409, "You are already registered for this competition")
-			}
-			_, err = tx.Exec(`INSERT INTO registrations (competition_id, user_id) VALUES (?, ?)`, competitionID, user.ID)
+			competitionID, user.ID, teamID); err != nil {
 			return err
 		}
 
@@ -88,6 +89,9 @@ func (a *App) Register(user *User, competitionID, teamID int64) error {
 			return err
 		}
 		if n > 0 {
+			if solo {
+				return fail(409, "You are already registered for this competition")
+			}
 			return fail(409, "One or more team members are already registered for this competition")
 		}
 
@@ -95,7 +99,9 @@ func (a *App) Register(user *User, competitionID, teamID int64) error {
 		if db.IsUniqueViolation(err) {
 			return fail(409, "This team is already registered")
 		}
-		who = "Team " + t.Name
+		if !solo {
+			who = "Team " + t.Name
+		}
 		return err
 	})
 	if err != nil {

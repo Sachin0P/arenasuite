@@ -186,7 +186,10 @@ change `PORT` in `.env`.
 - Organizers can set a **maximum number of people per team**; team sizes and
   joins are capped by it
 - Find a Team: teams looking for members, and players looking for a team
-- Individual and team registration with organizer approval
+- Team registration with organizer approval. "Register Individually" creates a
+  one-person team for the player, so solo players appear in team lists and fixtures
+- Organizers can't take part in their own competitions (registering, teams,
+  join requests and invites are all blocked)
 - Fixture generation: seeded knockout brackets and round robin
 - Live scores and automatic standings (Sports/Esports); direct score entry (Academic)
 - Notifications (live badge plus a notifications page)

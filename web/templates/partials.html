@@ -55,7 +55,7 @@
       {{with $t.RequiredSkills}}<p class="tiny-text muted">Skills: {{.}}</p>{{end}}
     </div>
   {{end}}
-  {{if and .User $t.LookingForMembers (not $t.IsFull) (ne $t.CaptainID .User.ID)}}
+  {{if and .User $t.LookingForMembers (not $t.IsFull) (ne $t.CaptainID .User.ID) (not ($t.OrganizedBy .User))}}
     {{$requestID := index .Requests $t.ID}}
     {{if $requestID}}
       <form method="post" action="/join-requests/{{$requestID}}/cancel" class="mt">

@@ -80,6 +80,10 @@ type Competition struct {
 
 func (c Competition) IsKnockout() bool { return tournament.IsKnockout(c.Format) }
 
+// OrganizedBy reports whether u runs this competition (owns its organization).
+// Organizers can't take part in their own competitions.
+func (c Competition) OrganizedBy(u *User) bool { return u != nil && c.OrgOwnerID == u.ID }
+
 // RegistrationOpen: published and the deadline hasn't passed yet.
 func (c Competition) RegistrationOpen() bool {
 	return c.Status == "published" && c.RegistrationDeadline >= nowLocal()
@@ -111,6 +115,7 @@ type Team struct {
 	CompetitionName string `db:"competition_name"`
 	Category        string `db:"category"`
 	MaxTeamSize     int64  `db:"competition_max_team_size"` // the competition's limit, 0 = none
+	OrganizerID     int64  `db:"competition_organizer_id"`  // who runs the team's competition
 
 	Members []TeamMember // only filled by TeamByID
 }
@@ -125,6 +130,9 @@ func (t Team) Capacity() int64 {
 }
 
 func (t Team) IsFull() bool { return t.MemberCount >= t.Capacity() }
+
+// OrganizedBy reports whether u runs the competition this team is in.
+func (t Team) OrganizedBy(u *User) bool { return u != nil && t.OrganizerID == u.ID }
 
 // HasMember reports whether a user is an active member (needs Members loaded).
 func (t Team) HasMember(userID int64) bool {

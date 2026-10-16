@@ -34,7 +34,7 @@
     <div class="grid form">
       <select name="competitionId" required>
         <option value="">Select competition</option>
-        {{range $d.Competitions}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+        {{range $d.Competitions}}{{if not (.OrganizedBy $.User)}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
       </select>
       <input name="role" placeholder="Role you want (e.g. Backend Developer)" required>
       <input name="skills" placeholder="Skills (e.g. Go, SQL)">

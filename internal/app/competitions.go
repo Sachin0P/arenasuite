@@ -146,6 +146,17 @@ func CanManage(user *User, c *Competition) bool {
 	return user != nil && (user.IsAdmin() || c.OrgOwnerID == user.ID)
 }
 
+// organizerMsg is shown when an organizer tries to take part in their own competition.
+const organizerMsg = "You're organizing this competition, so you can't take part in it"
+
+// mustNotOrganize stops organizers from entering their own competition.
+func mustNotOrganize(user *User, c *Competition) error {
+	if c.OrganizedBy(user) {
+		return fail(403, organizerMsg)
+	}
+	return nil
+}
+
 // competitionToManage loads a competition and checks the user may manage it.
 func (a *App) competitionToManage(user *User, id int64) (*Competition, error) {
 	c, err := a.getCompetition(a.DB, id)

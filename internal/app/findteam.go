@@ -71,10 +71,14 @@ func (a *App) CreatePost(user *User, in PostInput) error {
 			return err
 		}
 	}
-	if _, err := a.getCompetition(a.DB, in.CompetitionID); err != nil {
+	c, err := a.getCompetition(a.DB, in.CompetitionID)
+	if err != nil {
 		return err
 	}
-	_, err := a.DB.Exec(`
+	if err := mustNotOrganize(user, c); err != nil {
+		return err
+	}
+	_, err = a.DB.Exec(`
 		INSERT INTO looking_for_team_posts (competition_id, user_id, role, skills, experience, description)
 		VALUES (?, ?, ?, ?, ?, ?)`,
 		in.CompetitionID, user.ID, in.Role, db.NullIfEmpty(in.Skills), db.NullIfEmpty(in.Experience), db.NullIfEmpty(in.Description))
