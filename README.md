@@ -31,8 +31,11 @@ You need:
 ```sh
 brew install postgresql@17
 brew services start postgresql@17      # runs in the background, starts at login
-/opt/homebrew/opt/postgresql@17/bin/createdb arenasuite
+createdb arenasuite
 ```
+
+If `createdb` isn't found, run `brew link postgresql@17` and open a new
+terminal.
 
 Your connection URL is
 `postgres://YOUR_MAC_USERNAME@localhost:5432/arenasuite?sslmode=disable`.
@@ -156,8 +159,8 @@ Be careful with the URL:
 | Run the server | `go run .` |
 | Add sample data | `go run ./cmd/seed` |
 | Run the tests | `go test ./...` |
-| Open the database in a terminal | `psql "$DATABASE_URL"` (Homebrew: `/opt/homebrew/opt/postgresql@17/bin/psql`) |
-| Start over with an empty local database | `dropdb arenasuite && createdb arenasuite` |
+| Open the local database in a terminal | `psql arenasuite` (for a hosted one: `psql "<connection URL>"`) |
+| Start over with an empty local database | stop the server, then `dropdb arenasuite && createdb arenasuite` |
 | Build a single program file | `go build -o arenasuite .` then `./arenasuite` |
 | Build a Docker image | `docker build -t arenasuite .` |
 
