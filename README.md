@@ -23,8 +23,8 @@ Besides the standard library it uses [`pgx`](https://github.com/jackc/pgx)
 `golang.org/x/time/rate` (rate limiting). Pages are server-rendered with
 `html/template`. The browser side is one CSS file, a small script for tabs,
 toasts and live updates, and optional eye candy: a [three.js](https://threejs.org)
-scene behind every page (a smashable 3D orb on the home page) plus page
-animations. It's a rewrite of the earlier Node/Express + Angular version.
+scene of floating sports kit behind every page, a floodlit 3D stadium with a
+penalty shoot-out on the home page, and page animations. It's a rewrite of the earlier Node/Express + Angular version.
 
 ## Getting started
 
@@ -233,7 +233,7 @@ ui/
   html/                  base.tmpl, partials/*.tmpl, pages/*.tmpl
   static/                app.css, app.js (tabs, toasts, live updates),
                          fx.js (three.js scenes), motion.js (animations),
-                         vendor/ (three.js r170, MIT)
+                         vendor/ (three.js r170, MIT; Anton font, OFL)
 Makefile                 run, seed, audit and build commands
 ```
 

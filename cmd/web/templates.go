@@ -178,6 +178,8 @@ func statusColor(status string) string {
 	case "published", "approved", "accepted", "open", "active":
 		return "green"
 	case "ongoing", "live":
+		return "live" // a pulsing red "on air" pill
+	case "scheduled":
 		return "blue"
 	case "cancelled", "rejected", "suspended":
 		return "red"

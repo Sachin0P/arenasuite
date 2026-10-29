@@ -148,7 +148,7 @@ function setupCursor() {
   window.addEventListener("pointermove", (e) => {
     x = e.clientX;
     y = e.clientY;
-    const interactive = e.target.closest?.("a, button, summary, .card, label.check, [data-reveal], .hero-stage");
+    const interactive = e.target.closest?.("a, button, summary, .card, label.check, [data-reveal]");
     ring.classList.toggle("hover", Boolean(interactive));
   });
   window.addEventListener("pointerdown", () => ring.classList.add("down"));
@@ -270,15 +270,15 @@ if (!reducedMotion) {
   }
 
   // Successes get confetti: the flash message from the last form action
-  // (shown by app.js before this module ran), later toasts, and smashing
-  // the home page orb.
+  // (shown by app.js before this module ran), later toasts, and goals in
+  // the home page penalty game.
   const flash = document.getElementById("flash");
   if (flash?.dataset.kind === "success") confetti(window.innerWidth - 120, window.innerHeight - 60, 60);
   document.addEventListener("arena:toast", (e) => {
     if (e.detail.kind === "success") confetti(window.innerWidth - 120, window.innerHeight - 60, 60);
   });
-  document.addEventListener("arena:smash", (e) => {
+  document.addEventListener("arena:goal", () => {
     const stage = document.getElementById("hero-stage")?.getBoundingClientRect();
-    if (stage) confetti(stage.left + stage.width * 0.7, stage.top + stage.height * 0.5, 50);
+    if (stage) confetti(stage.left + stage.width * 0.6, stage.top + stage.height * 0.4, 90);
   });
 }

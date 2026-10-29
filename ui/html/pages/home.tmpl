@@ -2,17 +2,23 @@
 
 {{define "main"}}
 <section class="hero">
-  {{/* fx.js draws the 3D orb in here. */}}
+  {{/* fx.js draws the floodlit stadium and runs the penalty game in here. */}}
   <div class="hero-stage" id="hero-stage" aria-hidden="true"></div>
+  <div class="scoreboard" aria-hidden="true">
+    <span class="sb-label">Goals</span><span></span><span class="sb-label">Shots</span>
+    <span class="sb-num" id="sb-goals">0</span><span class="sb-sep">:</span><span class="sb-num" id="sb-shots">0</span>
+    <span class="sb-clock" id="sb-clock">Kick-off</span>
+  </div>
+  <div class="goal-burst" id="goal-burst" aria-hidden="true"></div>
   <div class="container hero-copy">
-    <p class="kicker">// Thapar campus · season {{.CurrentYear}}</p>
+    <p class="kicker">// Matchday {{.CurrentYear}} · Thapar campus</p>
     <h1><span class="line">Compete.</span><span class="line">Connect.</span><span class="line">Win.</span></h1>
     <p class="lede">Discover and participate in college competitions — all in one place.</p>
     <div class="row">
       <a href="/competitions" class="btn btn-primary">Explore Competitions</a>
       <a href="/organize" class="btn">Organize an Event</a>
     </div>
-    <p class="hint tiny-text"><b>Drag</b> the orb to spin it · <b>click</b> to smash it</p>
+    <p class="hint tiny-text"><b>Move</b> to aim · <b>click</b> to take a penalty</p>
   </div>
 </section>
 
