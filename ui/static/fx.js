@@ -6,7 +6,9 @@
 //     pages; game controllers on Esports pages. It follows the mouse and the
 //     scroll position, and scatters when a live event (or a goal) happens.
 //   - The home page hero is a floodlit stadium with a penalty shoot-out:
-//     move to aim, click to shoot, and try to beat the keeper.
+//     move to aim, click to shoot, and try to beat KEEPER-BOT, a robot
+//     goalkeeper. Goals get slow motion, a camera swoop, fireworks and a
+//     Mexican wave.
 //
 // Every material is flat-shaded, wireframe or a single flat colour, so each
 // face is one solid colour. Nothing here is needed to use the site: without
@@ -389,6 +391,112 @@ function backgroundScene() {
 
 // ---------- the home page stadium ----------
 
+// makeKeeperBot builds KEEPER-BOT, the robot goalkeeper: a jointed rig
+// (hips, torso, head, shoulders, elbows, hips and knees) so it can crouch,
+// shuffle, dive and react. Its LED visor has three faces: normal, happy
+// (^ ^, after a save) and sad (X X, after a goal).
+function makeKeeperBot() {
+  const shell = flat(0xecedf3, { roughness: 0.35, metalness: 0.15 });
+  const trim = flat(COLORS.esports);
+  const dark = flat(0x18181f);
+  const mitt = flat(COLORS.volt, { emissive: COLORS.volt, emissiveIntensity: 0.15 });
+  const led = solid(COLORS.volt);
+  const capsule = (r, l) => new THREE.CapsuleGeometry(r, l, 3, 8);
+
+  const add = (parent, geometry, material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geometry, material);
+    m.position.set(x, y, z);
+    parent.add(m);
+    return m;
+  };
+  const joint = (parent, x, y, z = 0) => {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    parent.add(g);
+    return g;
+  };
+
+  const root = new THREE.Group(); // stands on the goal line
+  const hips = joint(root, 0, 0.92); // the whole body rolls around the hips when diving
+  add(hips, new THREE.BoxGeometry(0.5, 0.22, 0.3), dark);
+
+  const torso = joint(hips, 0, 0.1);
+  add(torso, capsule(0.3, 0.32), shell, 0, 0.42).scale.set(1.2, 1, 0.75);
+  add(torso, new THREE.BoxGeometry(0.64, 0.09, 0.44), trim, 0, 0.36); // chest stripe
+  add(torso, new THREE.BoxGeometry(0.16, 0.16, 0.05), trim, 0, 0.58, 0.22); // badge
+  add(torso, new THREE.CylinderGeometry(0.06, 0.08, 0.14, 6), dark, 0, 0.86); // neck
+
+  const head = joint(torso, 0, 1.06);
+  add(head, new THREE.IcosahedronGeometry(0.27, 1), shell);
+  add(head, new THREE.BoxGeometry(0.44, 0.15, 0.1), dark, 0, 0.02, 0.21); // visor
+  add(head, new THREE.CylinderGeometry(0.012, 0.012, 0.24, 4), dark, 0.12, 0.33).rotation.z = -0.3; // antenna
+  add(head, new THREE.SphereGeometry(0.04, 6, 4), trim, 0.16, 0.45);
+
+  const faces = { normal: new THREE.Group(), happy: new THREE.Group(), sad: new THREE.Group() };
+  const bar = (w) => new THREE.BoxGeometry(w, 0.02, 0.01);
+  for (const face of Object.values(faces)) {
+    face.position.set(0, 0.02, 0.265);
+    head.add(face);
+  }
+  faces.happy.visible = false;
+  faces.sad.visible = false;
+  for (const x of [-0.1, 0.1]) {
+    add(faces.normal, new THREE.BoxGeometry(0.08, 0.06, 0.01), led, x, 0);
+    add(faces.happy, bar(0.06), led, x - 0.02, 0.005).rotation.z = 0.7; // ^
+    add(faces.happy, bar(0.06), led, x + 0.02, 0.005).rotation.z = -0.7;
+    add(faces.sad, bar(0.085), led, x, 0).rotation.z = 0.8; // X
+    add(faces.sad, bar(0.085), led, x, 0).rotation.z = -0.8;
+  }
+
+  const limbs = {};
+  for (const [name, side] of [["L", -1], ["R", 1]]) {
+    const shoulder = joint(torso, side * 0.45, 0.62);
+    add(shoulder, capsule(0.085, 0.26), shell, 0, -0.2);
+    const elbow = joint(shoulder, 0, -0.4);
+    add(elbow, capsule(0.075, 0.24), trim, 0, -0.18);
+    add(elbow, capsule(0.15, 0.1), mitt, 0, -0.42).scale.z = 0.6;
+
+    const hip = joint(hips, side * 0.15, -0.08);
+    add(hip, capsule(0.1, 0.26), dark, 0, -0.2);
+    const knee = joint(hip, 0, -0.42);
+    add(knee, capsule(0.09, 0.26), shell, 0, -0.2);
+    add(knee, new THREE.BoxGeometry(0.18, 0.12, 0.3), trim, 0, -0.43, 0.05);
+
+    limbs[name] = { side, shoulder, elbow, hip, knee };
+  }
+
+  // The pose is a handful of numbers that ease towards a target each frame.
+  const pose = { x: 0, lift: 0, roll: 0, crouch: 0.5, lean: 0.2, armL: -0.9, armR: 0.9, elbow: -0.7, stance: 0.18, yaw: 0, pitch: 0 };
+  let face = "normal";
+
+  return {
+    root,
+    pose,
+    // apply eases the pose towards target (rate = how snappy) and moves the joints.
+    apply(target, rate, dt) {
+      const k = 1 - Math.exp(-rate * dt);
+      for (const key of Object.keys(pose)) pose[key] += (target[key] - pose[key]) * k;
+
+      root.position.x = pose.x;
+      root.position.y = pose.lift - pose.crouch * 0.2;
+      hips.rotation.z = pose.roll;
+      torso.rotation.x = pose.lean;
+      head.rotation.set(pose.pitch, pose.yaw, 0);
+      for (const limb of Object.values(limbs)) {
+        limb.shoulder.rotation.z = limb.side < 0 ? pose.armL : pose.armR;
+        limb.elbow.rotation.x = pose.elbow;
+        limb.hip.rotation.set(-pose.crouch * 0.8, 0, limb.side * pose.stance);
+        limb.knee.rotation.x = pose.crouch * 1.5;
+      }
+    },
+    setFace(name) {
+      if (name === face) return;
+      face = name;
+      for (const [key, group] of Object.entries(faces)) group.visible = key === name;
+    },
+  };
+}
+
 function stadiumScene(host, background) {
   const canvas = document.createElement("canvas");
   host.append(canvas);
@@ -410,7 +518,6 @@ function stadiumScene(host, background) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
   camera.position.set(0, 2.1, -3.4);
-  const lookAt = new THREE.Vector3(0, 1.1, GOAL_Z);
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.7));
   const flood = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -428,7 +535,6 @@ function stadiumScene(host, background) {
     band.position.set(0, 0, 4 - i * 2.9);
     scene.add(band);
   }
-  // Grass beyond the goal line, before the stands.
   const apron = new THREE.Mesh(new THREE.PlaneGeometry(60, 10), solid(0x092a14));
   apron.rotation.x = -Math.PI / 2;
   apron.position.set(0, -0.01, GOAL_Z - 5);
@@ -467,10 +573,10 @@ function stadiumScene(host, background) {
     p.position.set(x, GOAL_H / 2, GOAL_Z);
     scene.add(p);
   }
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, GOAL_W + 0.14, 8), postMaterial);
-  bar.rotation.z = Math.PI / 2;
-  bar.position.set(0, GOAL_H, GOAL_Z);
-  scene.add(bar);
+  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, GOAL_W + 0.14, 8), postMaterial);
+  crossbar.rotation.z = Math.PI / 2;
+  crossbar.position.set(0, GOAL_H, GOAL_Z);
+  scene.add(crossbar);
 
   const netMaterial = solid(COLORS.white, { wireframe: true, transparent: true, opacity: 0.4 });
   const backNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_W, GOAL_H, 16, 6), netMaterial);
@@ -489,33 +595,42 @@ function stadiumScene(host, background) {
   }
 
   // ----- the stands and the crowd -----
+  // Each fan remembers their seat height and their angle around the
+  // stadium, so a Mexican wave can travel round after a goal.
   const crowdPositions = [];
   const crowdColors = [];
+  const crowdSeatY = [];
+  const crowdAngle = [];
   const crowdPalette = [COLORS.volt, COLORS.sports, COLORS.academic, COLORS.esports, COLORS.white, 0x555560].map((c) => new THREE.Color(c));
-  const tier = (w, d, x, y, z, along) => {
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), flat(y % 2 ? 0x17171d : 0x1d1d25));
+  const stadiumCentre = GOAL_Z + 6;
+  const tier = (i, w, d, x, y, z, along) => {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), flat(i % 2 ? 0x17171d : 0x1d1d25));
     box.position.set(x, y, z);
     scene.add(box);
     const n = Math.floor((along === "x" ? w : d) * 3.2);
-    for (let i = 0; i < n; i++) {
+    for (let k = 0; k < n; k++) {
       const offset = (Math.random() - 0.5) * (along === "x" ? w : d);
-      crowdPositions.push(along === "x" ? x + offset : x + (Math.random() - 0.5) * w, y + 0.7, along === "x" ? z + (Math.random() - 0.5) * d : z + offset);
+      const px = along === "x" ? x + offset : x + (Math.random() - 0.5) * w;
+      const pz = along === "x" ? z + (Math.random() - 0.5) * d : z + offset;
+      crowdPositions.push(px, y + 0.7, pz);
+      crowdSeatY.push(y + 0.7);
+      crowdAngle.push(Math.atan2(px, pz - stadiumCentre));
       const c = crowdPalette[(Math.random() * crowdPalette.length) | 0];
       crowdColors.push(c.r, c.g, c.b);
     }
   };
   for (let i = 0; i < 6; i++) {
-    tier(52, 1.8, 0, 0.55 + i * 1.15, GOAL_Z - 5.5 - i * 1.8, "x"); // behind the goal
-    tier(1.8, 30, -17 - i * 1.8, 0.55 + i * 1.15, GOAL_Z + 9, "z"); // left side
-    tier(1.8, 30, 17 + i * 1.8, 0.55 + i * 1.15, GOAL_Z + 9, "z"); // right side
+    tier(i, 52, 1.8, 0, 0.55 + i * 1.15, GOAL_Z - 5.5 - i * 1.8, "x"); // behind the goal
+    tier(i, 1.8, 30, -17 - i * 1.8, 0.55 + i * 1.15, GOAL_Z + 9, "z"); // left side
+    tier(i, 1.8, 30, 17 + i * 1.8, 0.55 + i * 1.15, GOAL_Z + 9, "z"); // right side
   }
   const crowdGeometry = new THREE.BufferGeometry();
   crowdGeometry.setAttribute("position", new THREE.Float32BufferAttribute(crowdPositions, 3));
   crowdGeometry.setAttribute("color", new THREE.Float32BufferAttribute(crowdColors, 3));
-  const crowd = new THREE.Points(crowdGeometry, new THREE.PointsMaterial({ size: 0.16, vertexColors: true }));
-  scene.add(crowd);
+  scene.add(new THREE.Points(crowdGeometry, new THREE.PointsMaterial({ size: 0.16, vertexColors: true })));
   const crowdBase = crowdColors.slice();
   const flashes = []; // camera flashes in the crowd: { index, until }
+  let waveStart = -Infinity;
 
   // ----- floodlight towers, each throwing a flat cone of light -----
   const beamGeometry = new THREE.ConeGeometry(4.5, 22, 20, 1, true);
@@ -526,12 +641,12 @@ function stadiumScene(host, background) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 15, 6), flat(0x2a2a33));
     pole.position.set(x, 7.5, z);
     scene.add(pole);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(3, 1.6, 0.3), solid(0xfffbe6));
-    head.position.set(x, 15.2, z);
-    head.lookAt(0, 0, GOAL_Z + 4);
-    scene.add(head);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(3, 1.6, 0.3), solid(0xfffbe6));
+    lamp.position.set(x, 15.2, z);
+    lamp.lookAt(0, 0, GOAL_Z + 4);
+    scene.add(lamp);
     const beam = new THREE.Mesh(beamGeometry, beamMaterial);
-    beam.position.copy(head.position);
+    beam.position.copy(lamp.position);
     beam.lookAt(x * 0.3, 0, GOAL_Z + 3);
     scene.add(beam);
   }
@@ -543,31 +658,35 @@ function stadiumScene(host, background) {
   starGeometry.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
   scene.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: COLORS.white, size: 0.18 })));
 
-  // ----- the keeper, in the Esports magenta kit -----
-  const keeper = new THREE.Group();
-  const kit = flat(COLORS.esports);
-  const dark = flat(0x111114);
-  const glove = flat(COLORS.volt);
-  const part = (geometry, material, x, y, z = 0) => {
-    const m = new THREE.Mesh(geometry, material);
-    m.position.set(x, y, z);
-    keeper.add(m);
-    return m;
-  };
-  part(new THREE.BoxGeometry(0.75, 0.85, 0.38), kit, 0, 1.25);
-  part(new THREE.SphereGeometry(0.22, 8, 6), flat(0xd9a77c), 0, 1.92);
-  part(new THREE.BoxGeometry(0.26, 0.85, 0.3), dark, -0.2, 0.42);
-  part(new THREE.BoxGeometry(0.26, 0.85, 0.3), dark, 0.2, 0.42);
-  const armL = part(new THREE.BoxGeometry(0.2, 0.8, 0.22), kit, -0.55, 1.55);
-  const armR = part(new THREE.BoxGeometry(0.2, 0.8, 0.22), kit, 0.55, 1.55);
-  armL.rotation.z = -0.5;
-  armR.rotation.z = 0.5;
-  part(new THREE.SphereGeometry(0.16, 6, 4), glove, -0.78, 1.95);
-  part(new THREE.SphereGeometry(0.16, 6, 4), glove, 0.78, 1.95);
-  keeper.position.set(0, 0, GOAL_Z + 0.5);
-  scene.add(keeper);
+  // ----- fireworks: a pool of square sparks that burst over the stands -----
+  const SPARKS = 480;
+  const sparkPositions = new Float32Array(SPARKS * 3).fill(-999);
+  const sparkColors = new Float32Array(SPARKS * 3);
+  const sparks = Array.from({ length: SPARKS }, () => ({ velocity: new THREE.Vector3(), life: 0 }));
+  const sparkGeometry = new THREE.BufferGeometry();
+  sparkGeometry.setAttribute("position", new THREE.BufferAttribute(sparkPositions, 3));
+  sparkGeometry.setAttribute("color", new THREE.BufferAttribute(sparkColors, 3));
+  scene.add(new THREE.Points(sparkGeometry, new THREE.PointsMaterial({ size: 0.3, vertexColors: true })));
+  let nextSpark = 0;
 
-  // ----- the ball, its shadow and the aiming ring -----
+  const firework = (origin, color) => {
+    const c = new THREE.Color(color);
+    for (let i = 0; i < 70; i++) {
+      const s = sparks[nextSpark];
+      sparkPositions.set([origin.x, origin.y, origin.z], nextSpark * 3);
+      sparkColors.set([c.r, c.g, c.b], nextSpark * 3);
+      s.velocity.randomDirection().multiplyScalar(5 + Math.random() * 4);
+      s.life = 1.4 + Math.random() * 0.5;
+      nextSpark = (nextSpark + 1) % SPARKS;
+    }
+  };
+
+  // ----- KEEPER-BOT -----
+  const keeper = makeKeeperBot();
+  keeper.root.position.z = GOAL_Z + 0.5;
+  scene.add(keeper.root);
+
+  // ----- the ball, its shadow, its trail and the aiming ring -----
   const ball = KIT.football();
   ball.scale.setScalar(BALL_R);
   ball.position.copy(SPOT);
@@ -576,6 +695,18 @@ function stadiumScene(host, background) {
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(BALL_R * 1.1, 16), solid(0x000000, { transparent: true, opacity: 0.45, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2;
   scene.add(shadow);
+
+  // The trail is a row of shrinking yellow ghosts of the ball.
+  const trailGeometry = new THREE.IcosahedronGeometry(BALL_R, 1);
+  const trailMaterial = solid(COLORS.volt, { transparent: true, opacity: 0.35, depthWrite: false });
+  const trail = Array.from({ length: 10 }, (_, i) => {
+    const ghost = new THREE.Mesh(trailGeometry, trailMaterial);
+    ghost.scale.setScalar(0.85 - i * 0.07);
+    ghost.visible = false;
+    scene.add(ghost);
+    return ghost;
+  });
+  const history = [];
 
   const aimRing = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.36, 28), solid(COLORS.volt, { transparent: true, opacity: 0.95, depthTest: false }));
   aimRing.renderOrder = 10;
@@ -596,10 +727,11 @@ function stadiumScene(host, background) {
   new ResizeObserver(resize).observe(host);
   resize();
 
-  // ----- the scoreboard and result banner (HTML, see home.tmpl) -----
+  // ----- the scoreboard, result banner and slow-mo tag (HTML, see home.tmpl) -----
   const goalsEl = document.getElementById("sb-goals");
   const shotsEl = document.getElementById("sb-shots");
   const burst = document.getElementById("goal-burst");
+  const slowmoTag = document.getElementById("slowmo-tag");
   let goals = 0;
   let shots = 0;
 
@@ -627,8 +759,17 @@ function stadiumScene(host, background) {
   let netPush = 0;
   let netVelocity = 0;
   const netHit = new THREE.Vector2();
-  let dive = { dir: 0, t: 0, active: false };
   let resetAt = 0;
+
+  // What the keeper is doing: "ready", "dive", "celebrate", "sad" or "watch".
+  let keeperMode = "ready";
+  let diveDir = 0;
+  let diveAt = 0;
+
+  // Goals get the full treatment: slow motion and a camera swoop.
+  let timeScale = 1;
+  let slowmoUntil = 0;
+  let replayUntil = 0;
 
   const raycaster = new THREE.Raycaster();
   const goalPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -GOAL_Z);
@@ -645,6 +786,8 @@ function stadiumScene(host, background) {
   };
 
   let press = null;
+  // Aim keeps following the pointer between shots, so it's right when the
+  // ball is back on the spot. A shot in the air keeps its own target.
   host.addEventListener("pointermove", aimAt);
   host.addEventListener("pointerdown", (e) => {
     aimAt(e);
@@ -664,21 +807,24 @@ function stadiumScene(host, background) {
     // A little error on every shot, and some curl.
     const target = aim.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.4, 0));
     flight = { from: ball.position.clone(), to: target, curl: (Math.random() - 0.5) * 1.6, t: 0, duration: 0.62 };
+    history.length = 0;
 
     // The keeper guesses: usually towards the side you're aiming at.
     const side = Math.sign(aim.x) || 1;
     const roll = Math.random();
-    dive = { dir: roll < 0.45 ? side : roll < 0.75 ? -side : 0, t: 0, active: true };
+    diveDir = roll < 0.45 ? side : roll < 0.75 ? -side : 0;
+    diveAt = performance.now() + 110; // a split second to react
   }
 
-  // Where the keeper's gloves can reach, given how far the dive has gone.
+  // Where the keeper's mitts can reach at the moment the ball arrives.
   function keeperReaches(x, y) {
-    const kx = keeper.position.x;
-    if (dive.dir === 0) return Math.abs(x - kx) < 0.9 && y < 2.6;
-    return Math.abs(x - kx) < 1.25 && y < 1.9;
+    const kx = keeper.pose.x;
+    if (diveDir === 0) return Math.abs(x - kx) < 0.9 && y < 2.7;
+    return Math.abs(x - kx) < 1.3 && y < 2.0;
   }
 
   function finishShot() {
+    const now = performance.now();
     const { x, y } = ball.position;
     const dir = flight.to.clone().sub(flight.from).normalize();
     const inside = Math.abs(x) < GOAL_W / 2 - BALL_R * 0.6 && y < GOAL_H - BALL_R * 0.6;
@@ -689,17 +835,21 @@ function stadiumScene(host, background) {
     let scored = false;
     if (inside && keeperReaches(x, y)) {
       text = "Saved!";
+      keeperMode = "celebrate";
       velocity.set((Math.random() - 0.5) * 8, 3.5, 7);
     } else if (inside) {
       text = "Goal!";
       scored = true;
+      keeperMode = "sad";
       velocity.copy(dir).multiplyScalar(9);
       netHit.set(x, y);
     } else if (hitsFrame || hitsBar) {
       text = hitsBar ? "Off the bar!" : "Off the post!";
+      keeperMode = "watch";
       velocity.set(-Math.sign(x) * 3 + (Math.random() - 0.5) * 3, hitsBar ? 4 : 2, 6);
     } else {
       text = y >= GOAL_H ? "Over!" : "Wide!";
+      keeperMode = "watch";
       velocity.copy(dir).multiplyScalar(14);
     }
 
@@ -708,33 +858,97 @@ function stadiumScene(host, background) {
       bump(goalsEl, goals);
       background?.shockwave(1.5);
       document.dispatchEvent(new CustomEvent("arena:goal"));
-      // The crowd goes wild: a burst of camera flashes.
-      for (let i = 0; i < 80; i++) flashes.push({ index: (Math.random() * (crowdPositions.length / 3)) | 0, until: performance.now() + 150 + Math.random() * 900 });
+
+      // Slow motion and a camera swoop to the side of the goal...
+      slowmoUntil = now + 1100;
+      replayUntil = now + 2000;
+      slowmoTag?.classList.add("on");
+      // ...the crowd stands up in a wave, with camera flashes everywhere...
+      waveStart = now;
+      for (let i = 0; i < 90; i++) flashes.push({ index: (Math.random() * (crowdPositions.length / 3)) | 0, until: now + 150 + Math.random() * 1200 });
+      // ...and fireworks go up over the stands.
+      [COLORS.volt, COLORS.sports, COLORS.esports, COLORS.academic, COLORS.volt].forEach((color, i) => {
+        setTimeout(() => firework(new THREE.Vector3((Math.random() - 0.5) * 30, 12 + Math.random() * 6, GOAL_Z - 8 - Math.random() * 6), color), 250 + i * 260);
+      });
     }
     announce(text, scored);
 
     state = "loose";
-    resetAt = performance.now() + 1700;
+    resetAt = now + (scored ? 2600 : 1800);
   }
 
   function resetShot() {
     state = "ready";
+    keeperMode = "ready";
+    diveDir = 0;
     ball.position.copy(SPOT);
     ball.rotation.set(0, 0, 0);
     ball.scale.setScalar(0.01);
     velocity.set(0, 0, 0);
-    dive = { dir: 0, t: 0, active: false };
+    history.length = 0;
+  }
+
+  // ----- keeper choreography -----
+  // Each mode is a target pose; KEEPER-BOT eases towards it.
+  function keeperTarget(t) {
+    const ready = {
+      x: Math.sin(t * 1.7) * 0.7, // shuffling along the line
+      lift: Math.abs(Math.sin(t * 3.4)) * 0.06,
+      roll: Math.sin(t * 1.7) * -0.05,
+      crouch: 0.55,
+      lean: 0.22,
+      armL: -0.95,
+      armR: 0.95,
+      elbow: -0.7,
+      stance: 0.2,
+      // The head follows your aim.
+      yaw: THREE.MathUtils.clamp((aim.x - keeper.pose.x) * 0.12, -0.6, 0.6),
+      pitch: THREE.MathUtils.clamp((1.4 - aim.y) * 0.12, -0.3, 0.3),
+    };
+
+    switch (keeperMode) {
+      case "dive":
+        return diveDir === 0
+          ? { ...ready, x: 0, lift: 0.8, roll: 0, crouch: 0, lean: 0, armL: -2.95, armR: 2.95, elbow: 0, stance: 0.08, yaw: 0, pitch: -0.3 }
+          : { ...ready, x: diveDir * 2.3, lift: 0.55, roll: -diveDir * 1.35, crouch: 0.05, lean: 0, armL: -2.8, armR: 2.8, elbow: 0, stance: 0.05, yaw: 0, pitch: 0 };
+      case "celebrate": {
+        // Fist pumps on the spot.
+        const pump = Math.abs(Math.sin(t * 9));
+        return { ...ready, x: keeper.pose.x * 0.98, lift: pump * 0.45, roll: 0, crouch: 0.15, lean: -0.1, armL: -2.6 - pump * 0.3, armR: 2.6 + pump * 0.3, elbow: -0.6 * pump, yaw: 0, pitch: -0.25 };
+      }
+      case "sad":
+        // Slumped on its knees, head down.
+        return { ...ready, x: keeper.pose.x, lift: -0.08, roll: 0, crouch: 0.95, lean: 0.55, armL: -0.15, armR: 0.15, elbow: -0.2, stance: 0.25, yaw: 0, pitch: 0.65 };
+      case "watch":
+        // Turns to watch the ball go by.
+        return { ...ready, x: keeper.pose.x, crouch: 0.3, armL: -1.3, armR: 1.3, elbow: -1.4, yaw: THREE.MathUtils.clamp(ball.position.x * 0.2, -0.8, 0.8), pitch: -0.2 };
+      default:
+        return ready;
+    }
   }
 
   // ----- animation -----
+  const cameraPosition = new THREE.Vector3(0, 2.1, -3.4);
+  const cameraLook = new THREE.Vector3(0, 1.1, GOAL_Z);
+  const wantPosition = new THREE.Vector3();
+  const wantLook = new THREE.Vector3();
+
   const { start, stop } = loop(tick);
   new IntersectionObserver(([entry]) => (entry.isIntersecting ? start() : stop())).observe(host);
 
-  function tick(dt, t) {
+  function tick(realDt, t) {
     const now = performance.now();
 
+    // Slow motion just after a goal.
+    const slowmo = now < slowmoUntil;
+    timeScale += ((slowmo ? 0.28 : 1) - timeScale) * 0.15;
+    if (!slowmo) slowmoTag?.classList.remove("on");
+    const dt = realDt * timeScale;
+
+    if (state === "flying" && keeperMode === "ready" && now > diveAt) keeperMode = "dive";
+
     // The ball pops back onto the spot after a reset.
-    if (ball.scale.x < BALL_R) ball.scale.setScalar(Math.min(BALL_R, ball.scale.x + dt * 1.6));
+    if (ball.scale.x < BALL_R) ball.scale.setScalar(Math.min(BALL_R, ball.scale.x + realDt * 1.6));
 
     if (state === "flying") {
       flight.t += dt / flight.duration;
@@ -763,27 +977,24 @@ function stadiumScene(host, background) {
       }
       if (now > resetAt) resetShot();
     } else {
-      ball.rotation.y += dt * 0.6; // idle on the spot
+      ball.rotation.y += realDt * 0.6; // idle on the spot
     }
 
     shadow.position.set(ball.position.x, 0.03, ball.position.z);
     shadow.scale.setScalar(Math.max(0.3, 1 - (ball.position.y - BALL_R) * 0.25));
 
-    // The keeper sways on the line, then dives.
-    if (dive.active) {
-      dive.t = Math.min(dive.t + dt / 0.42, 1);
-      const e = 1 - Math.pow(1 - dive.t, 3);
-      if (dive.dir === 0) {
-        keeper.position.set(0, Math.sin(e * Math.PI) * 0.8, GOAL_Z + 0.5);
-        keeper.rotation.z = 0;
-      } else {
-        keeper.position.set(dive.dir * 2.3 * e, Math.sin(e * Math.PI) * 0.6 + e * 0.15, GOAL_Z + 0.5);
-        keeper.rotation.z = -dive.dir * 1.25 * e;
-      }
-    } else {
-      keeper.position.set(Math.sin(t * 1.7) * 0.7, Math.abs(Math.sin(t * 3.4)) * 0.08, GOAL_Z + 0.5);
-      keeper.rotation.z = Math.sin(t * 1.7) * -0.06;
-    }
+    // The trail follows the ball while it's in the air.
+    history.unshift(ball.position.clone());
+    history.length = Math.min(history.length, trail.length * 2);
+    trail.forEach((ghost, i) => {
+      const p = history[(i + 1) * 2];
+      ghost.visible = state !== "ready" && Boolean(p) && ball.position.y > BALL_R + 0.05;
+      if (p) ghost.position.copy(p);
+    });
+
+    // KEEPER-BOT: dives are snappy, everything else is smooth.
+    keeper.apply(keeperTarget(t), keeperMode === "dive" ? 14 : 7, dt);
+    keeper.setFace(keeperMode === "celebrate" ? "happy" : keeperMode === "sad" ? "sad" : "normal");
 
     // The net bulges where the ball hit it, then springs back.
     netVelocity += (-60 * netPush - 7 * netVelocity) * dt;
@@ -797,32 +1008,67 @@ function stadiumScene(host, background) {
     }
     net.needsUpdate = true;
 
-    // Camera flashes twinkle across the crowd.
+    // The crowd: camera flashes all the time, and a Mexican wave after a goal.
     const colors = crowdGeometry.attributes.color;
     if (Math.random() < 0.5) flashes.push({ index: (Math.random() * colors.count) | 0, until: now + 120 });
     for (let i = flashes.length - 1; i >= 0; i--) {
       const f = flashes[i];
       const done = now > f.until;
-      colors.array[f.index * 3] = done ? crowdBase[f.index * 3] : 1;
-      colors.array[f.index * 3 + 1] = done ? crowdBase[f.index * 3 + 1] : 1;
-      colors.array[f.index * 3 + 2] = done ? crowdBase[f.index * 3 + 2] : 1;
+      for (let c = 0; c < 3; c++) colors.array[f.index * 3 + c] = done ? crowdBase[f.index * 3 + c] : 1;
       if (done) flashes.splice(i, 1);
     }
     colors.needsUpdate = true;
+
+    const waveAge = (now - waveStart) / 1000;
+    if (waveAge < 4.5) {
+      const positions = crowdGeometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        const phase = crowdAngle[i] * 2.2 - waveAge * 5;
+        const up = waveAge < 4 ? Math.max(0, Math.cos(phase)) ** 6 * 0.9 : 0;
+        positions.array[i * 3 + 1] = crowdSeatY[i] + up;
+      }
+      positions.needsUpdate = true;
+    }
+
+    // Fireworks: sparks fly out, fall and fade by shrinking out of sight.
+    for (let i = 0; i < SPARKS; i++) {
+      const s = sparks[i];
+      if (s.life <= 0) continue;
+      s.life -= realDt;
+      s.velocity.y -= 6 * realDt;
+      s.velocity.multiplyScalar(0.985);
+      sparkPositions[i * 3] += s.velocity.x * realDt;
+      sparkPositions[i * 3 + 1] += s.velocity.y * realDt;
+      sparkPositions[i * 3 + 2] += s.velocity.z * realDt;
+      if (s.life <= 0) sparkPositions[i * 3 + 1] = -999;
+    }
+    sparkGeometry.attributes.position.needsUpdate = true;
+    sparkGeometry.attributes.color.needsUpdate = true;
 
     aimRing.position.set(aim.x, aim.y, GOAL_Z + 0.05);
     aimRing.scale.setScalar(1 + Math.sin(t * 6) * 0.08);
     aimRing.visible = state === "ready";
 
-    // A gentle handheld-camera drift that follows the pointer.
-    camera.position.x += (pointer.x * 0.6 - camera.position.x) * 0.04;
-    camera.position.y += (2.1 - pointer.y * 0.3 - camera.position.y) * 0.04;
-    camera.lookAt(lookAt);
+    // The camera: a handheld drift behind the ball, or a swoop to the side
+    // of the goal for the slow-motion replay.
+    if (now < replayUntil) {
+      wantPosition.set(7.5, 2.2, GOAL_Z + 6.5);
+      wantLook.set(ball.position.x * 0.6 - 1.5, 1.0, GOAL_Z - 0.6);
+    } else {
+      wantPosition.set(pointer.x * 0.6, 2.1 - pointer.y * 0.3, -3.4);
+      wantLook.set(0, 1.1, GOAL_Z);
+    }
+    const ease = now < replayUntil ? 0.06 : 0.05;
+    cameraPosition.lerp(wantPosition, ease);
+    cameraLook.lerp(wantLook, ease);
+    camera.position.copy(cameraPosition);
+    camera.lookAt(cameraLook);
 
     renderer.render(scene, camera);
   }
 
-  camera.lookAt(lookAt);
+  keeper.apply(keeperTarget(0), 100, 1);
+  camera.lookAt(cameraLook);
   tick(0, 0);
 
   // The match clock on the scoreboard ticks over once a second.

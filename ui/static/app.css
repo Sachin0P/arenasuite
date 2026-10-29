@@ -373,6 +373,16 @@ a.card:hover .banner-fallback { translate: -14px 0; opacity: 1; color: var(--acc
   font-family: var(--display); font-size: clamp(4rem, 14vw, 11rem); line-height: 1; text-transform: uppercase;
   color: var(--volt); text-shadow: 6px 6px 0 #000, 12px 12px 0 var(--esports); opacity: 0;
 }
+/* Shown during the slow-motion replay after a goal. */
+.slowmo-tag {
+  position: absolute; left: 50%; top: 24px; z-index: 3; pointer-events: none; translate: -50% 0;
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase;
+  background: var(--onair); color: #fff; padding: 5px 12px; border-radius: 2px; box-shadow: 4px 4px 0 #000;
+  opacity: 0; transition: opacity 0.2s;
+}
+.slowmo-tag::before { content: "● "; animation: blink 0.8s steps(2) infinite; }
+.slowmo-tag.on { opacity: 1; }
+
 .goal-burst.miss { color: var(--text); text-shadow: 6px 6px 0 #000, 12px 12px 0 var(--academic); }
 .goal-burst.show { animation: burst 1.3s var(--ease-out) forwards; }
 @media (max-width: 860px) {
