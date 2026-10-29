@@ -5,34 +5,39 @@
 //     and tennis balls and shuttlecocks; trophies and medals on Academic
 //     pages; game controllers on Esports pages. It follows the mouse and the
 //     scroll position, and scatters when a live event (or a goal) happens.
-//   - The home page hero is a floodlit stadium with a penalty shoot-out:
-//     move to aim, click to shoot, and try to beat KEEPER-BOT, a robot
-//     goalkeeper. Goals get slow motion, a camera swoop, fireworks and a
-//     Mexican wave.
+//   - The home page hero is a stadium drawn like a printed poster, with a
+//     penalty shoot-out: move to aim, click to shoot, and try to beat
+//     KEEPER-BOT, a robot goalkeeper. Goals get slow motion, a camera swoop,
+//     paper confetti bursts and a Mexican wave.
 //
-// Every material is flat-shaded, wireframe or a single flat colour, so each
-// face is one solid colour. Nothing here is needed to use the site: without
-// WebGL, or with "reduce motion" on, the page just stays still.
+// The look is a hand-inked illustration in three colours: off-white paper,
+// chocolate-brown ink and light sage green. Materials are cel-shaded into
+// three hard bands of light (no smooth shading, no gradients), and the main
+// objects get chocolate ink outlines that "boil" a little, like hand-drawn
+// animation. Nothing here is needed to use the site: without WebGL, or with
+// "reduce motion" on, the page just stays still.
 
 import * as THREE from "./vendor/three.module.min.js";
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// The same palette as app.css.
 const COLORS = {
-  volt: 0xffe600,
-  sports: 0xc6ff00,
-  academic: 0x5b8cff,
-  esports: 0xff2e88,
-  white: 0xf4f4ef,
-  steel: 0x22222b,
-  night: 0x07070a,
+  paper: 0xf4efe4, // off-white
+  cream: 0xfbf8f1,
+  choc: 0x3e2519, // chocolate brown, the ink
+  cocoa: 0x6b4430,
+  caramel: 0xd2a77a,
+  sage: 0xaebf9a, // light sage green
+  sageMid: 0x93a97f,
+  moss: 0x587548,
 };
 
 function makeRenderer(canvas, opaque = false) {
   try {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: !opaque, powerPreference: "low-power" });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
-    renderer.setClearColor(COLORS.night, opaque ? 1 : 0);
+    renderer.setClearColor(COLORS.paper, opaque ? 1 : 0);
     return renderer;
   } catch {
     return null; // no WebGL: the page works fine without the scene
@@ -72,8 +77,57 @@ window.addEventListener("pointermove", (e) => {
 // Each maker returns a Group about 2 units across, centred on the origin.
 // Geometries and materials are built once and shared between copies.
 
-const flat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.55, metalness: 0.1, ...extra });
+// TONES is a three-step light ramp (shadow, mid-tone, lit) read with nearest
+// filtering, so toon materials snap between three flat bands of colour
+// instead of shading smoothly: cel shading, like an illustration.
+const TONES = (() => {
+  const texture = new THREE.DataTexture(new Uint8Array([95, 175, 255]), 3, 1, THREE.RedFormat);
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.needsUpdate = true;
+  return texture;
+})();
+
+const flat = (color, extra = {}) => new THREE.MeshToonMaterial({ color, gradientMap: TONES, ...extra });
 const solid = (color, extra = {}) => new THREE.MeshBasicMaterial({ color, ...extra });
+const ink = solid(COLORS.choc, { side: THREE.BackSide });
+
+// inked gives every mesh in object a chocolate outline: a slightly bigger
+// copy drawn inside out behind it (the "inverted hull" trick). The copy is
+// stretched so the outline is about `thickness` thick on every side, in the
+// mesh's own units. Rings and tubes are skipped, since growing them would
+// move the line instead of outlining it. It returns the outlines, so a
+// scene can make them wobble.
+function inked(object, thickness = 0.05, skip = () => false) {
+  const meshes = [];
+  object.traverse((o) => {
+    if (!o.isMesh || o.material === ink || o.material.wireframe || skip(o)) return;
+    const type = o.geometry.type;
+    if (type === "TorusGeometry" || type === "TubeGeometry" || type === "RingGeometry" || type === "CircleGeometry") return;
+    meshes.push(o);
+  });
+  return meshes.map((o) => {
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const size = o.geometry.boundingBox.getSize(new THREE.Vector3()).max(new THREE.Vector3(0.02, 0.02, 0.02));
+    const hull = new THREE.Mesh(o.geometry, ink);
+    hull.userData = { size, thickness };
+    hull.scale.set(1 + (2 * thickness) / size.x, 1 + (2 * thickness) / size.y, 1 + (2 * thickness) / size.z);
+    o.add(hull);
+    return hull;
+  });
+}
+
+// boil redraws outlines a touch thicker or thinner and a hair off-register,
+// a few times a second, so they shimmer like lines drawn by hand on every
+// frame of a cartoon.
+function boil(hulls) {
+  for (const hull of hulls) {
+    const { size, thickness } = hull.userData;
+    const t = thickness * (0.7 + Math.random() * 0.6);
+    hull.scale.set(1 + (2 * t) / size.x, 1 + (2 * t) / size.y, 1 + (2 * t) / size.z);
+    hull.position.set((Math.random() - 0.5) * thickness * 0.5, (Math.random() - 0.5) * thickness * 0.5, 0);
+  }
+}
 
 // footballGeometry builds a truncated icosahedron, the classic football: cut
 // every corner off an icosahedron at a third of each edge. The 20 faces
@@ -98,8 +152,8 @@ function footballGeometry() {
   const third = (a, b) => corners[a].clone().lerp(corners[b], 1 / 3);
   const positions = [];
   const colors = [];
-  const white = new THREE.Color(COLORS.white);
-  const black = new THREE.Color(0x111114);
+  const white = new THREE.Color(COLORS.cream);
+  const black = new THREE.Color(COLORS.choc);
 
   // Fan-triangulate a flat polygon around its centre, facing outwards.
   const polygon = (points, color) => {
@@ -140,6 +194,8 @@ function footballGeometry() {
   // The cut corners sit a little inside the unit sphere; scale back up to radius 1.
   const radius = new THREE.Vector3().fromArray(positions, 3).length();
   geometry.scale(1 / radius, 1 / radius, 1 / radius);
+  // Every triangle gets its own normal, so each panel is lit as one flat face.
+  geometry.computeVertexNormals();
   return geometry;
 }
 
@@ -182,22 +238,22 @@ const KIT = (() => {
     stick: new THREE.CylinderGeometry(0.11, 0.11, 0.1, 8),
   };
   const m = {
-    football: new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.45 }),
-    basketball: flat(0xff7a1a),
-    cricket: flat(0xb5121b, { roughness: 0.35 }),
-    tennis: flat(0xd8ff3a),
-    seamDark: flat(0x111114),
-    seamLight: flat(0xf1e3c6),
-    white: flat(COLORS.white),
-    feathers: solid(COLORS.white, { wireframe: true }),
-    gold: flat(0xffd400, { metalness: 0.55, roughness: 0.3, side: THREE.DoubleSide }),
-    darkGold: flat(0xb38f00, { metalness: 0.5 }),
-    plinth: flat(0x1b1b22),
-    ribbonA: flat(COLORS.academic),
-    ribbonB: flat(COLORS.esports),
-    pad: flat(0xe4e4ec, { roughness: 0.6 }), // a white console pad shows up on the dark page
-    padDetail: flat(0x22222b),
-    buttons: [COLORS.sports, COLORS.academic, COLORS.esports, COLORS.volt].map((c) => flat(c, { emissive: c, emissiveIntensity: 0.3 })),
+    football: flat(0xffffff, { vertexColors: true }),
+    basketball: flat(COLORS.caramel),
+    cricket: flat(COLORS.cocoa),
+    tennis: flat(COLORS.sage),
+    seamDark: flat(COLORS.choc),
+    seamLight: flat(COLORS.cream),
+    white: flat(COLORS.cream),
+    feathers: solid(COLORS.choc, { wireframe: true }),
+    gold: flat(COLORS.caramel, { side: THREE.DoubleSide }),
+    darkGold: flat(COLORS.cocoa),
+    plinth: flat(COLORS.choc),
+    ribbonA: flat(COLORS.sage),
+    ribbonB: flat(COLORS.moss),
+    pad: flat(COLORS.cream),
+    padDetail: flat(COLORS.choc),
+    buttons: [COLORS.sage, COLORS.caramel, COLORS.moss, COLORS.cocoa].map((c) => flat(c)),
   };
 
   const mesh = (geometry, material, setup) => {
@@ -316,8 +372,8 @@ function backgroundScene() {
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
   camera.position.z = 14;
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 2);
+  scene.add(new THREE.AmbientLight(0xfff6e8, 1.1));
+  const sun = new THREE.DirectionalLight(0xfff6e8, 2.4);
   sun.position.set(6, 9, 8);
   scene.add(sun);
 
@@ -327,6 +383,7 @@ function backgroundScene() {
 
   for (let i = 0; i < count; i++) {
     const item = KIT[kinds[i % kinds.length]]();
+    inked(item, 0.06);
     item.scale.setScalar(0.45 + Math.random() * 0.6);
     item.position.set((Math.random() - 0.5) * 34, (Math.random() - 0.5) * 24, -Math.random() * 16 + 2);
     item.rotation.set(Math.random() * 6, Math.random() * 6, 0);
@@ -394,13 +451,14 @@ function backgroundScene() {
 // makeKeeperBot builds KEEPER-BOT, the robot goalkeeper: a jointed rig
 // (hips, torso, head, shoulders, elbows, hips and knees) so it can crouch,
 // shuffle, dive and react. Its LED visor has three faces: normal, happy
-// (^ ^, after a save) and sad (X X, after a goal).
+// (^ ^, after a save) and sad (X X, after a goal). It's cream with a sage
+// kit and caramel mitts, and inked like the rest of the illustration.
 function makeKeeperBot() {
-  const shell = flat(0xecedf3, { roughness: 0.35, metalness: 0.15 });
-  const trim = flat(COLORS.esports);
-  const dark = flat(0x18181f);
-  const mitt = flat(COLORS.volt, { emissive: COLORS.volt, emissiveIntensity: 0.15 });
-  const led = solid(COLORS.volt);
+  const shell = flat(COLORS.cream);
+  const trim = flat(COLORS.sageMid);
+  const dark = flat(COLORS.choc);
+  const mitt = flat(COLORS.caramel);
+  const led = solid(0xd9e6c6);
   const capsule = (r, l) => new THREE.CapsuleGeometry(r, l, 3, 8);
 
   const add = (parent, geometry, material, x = 0, y = 0, z = 0) => {
@@ -465,6 +523,10 @@ function makeKeeperBot() {
     limbs[name] = { side, shoulder, elbow, hip, knee };
   }
 
+  // Outline everything except the chocolate parts (the ink would vanish
+  // into them anyway) and the LED faces.
+  const outlines = inked(root, 0.022, (o) => o.material === dark || o.material === led);
+
   // The pose is a handful of numbers that ease towards a target each frame.
   const pose = { x: 0, lift: 0, roll: 0, crouch: 0.5, lean: 0.2, armL: -0.9, armR: 0.9, elbow: -0.7, stance: 0.18, yaw: 0, pitch: 0 };
   let face = "normal";
@@ -472,6 +534,7 @@ function makeKeeperBot() {
   return {
     root,
     pose,
+    outlines,
     // apply eases the pose towards target (rate = how snappy) and moves the joints.
     apply(target, rate, dt) {
       const k = 1 - Math.exp(-rate * dt);
@@ -519,30 +582,98 @@ function stadiumScene(host, background) {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
   camera.position.set(0, 2.1, -3.4);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-  const flood = new THREE.DirectionalLight(0xffffff, 2.4);
-  flood.position.set(9, 16, 4);
-  scene.add(flood);
-  const backFlood = new THREE.DirectionalLight(0xfff3c4, 1.2);
-  backFlood.position.set(-10, 12, -24);
-  scene.add(backFlood);
+  // A warm afternoon sun over the paper.
+  scene.add(new THREE.AmbientLight(0xfff6e8, 1.05));
+  const sun = new THREE.DirectionalLight(0xfff3e0, 2.5);
+  sun.position.set(9, 16, 6);
+  scene.add(sun);
 
-  // ----- the pitch: mown stripes in two flat greens -----
+  // Everything inked in the stadium wobbles together (see boil()).
+  const outlines = [];
+
+  // ----- the sky: an art deco sunburst behind a paper sun -----
+  // Long flat rays fan out from the sun in two shades of paper and turn
+  // very slowly. The stands cover the bottom half.
+  const sky = new THREE.Group();
+  sky.position.set(0, 7, GOAL_Z - 46);
+  scene.add(sky);
+  const rays = new THREE.Group();
+  sky.add(rays);
+  const RAYS = 28;
+  for (let i = 0; i < RAYS; i += 2) {
+    const a = (i / RAYS) * Math.PI * 2;
+    const b = ((i + 1) / RAYS) * Math.PI * 2;
+    const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(Math.cos(a) * 140, Math.sin(a) * 140), new THREE.Vector2(Math.cos(b) * 140, Math.sin(b) * 140)]);
+    rays.add(new THREE.Mesh(new THREE.ShapeGeometry(shape), solid(0xebe2cf)));
+  }
+  const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(7, 48), solid(COLORS.caramel));
+  sunDisc.position.z = 0.1;
+  const sunRim = new THREE.Mesh(new THREE.RingGeometry(7, 7.5, 48), solid(COLORS.choc));
+  sunRim.position.z = 0.12;
+  const sunHalo = new THREE.Mesh(new THREE.RingGeometry(8.6, 9, 48), solid(COLORS.sage));
+  sunHalo.position.z = 0.11;
+  sky.add(sunDisc, sunRim, sunHalo);
+
+  // Paper-cut clouds: overlapping cream circles on slightly bigger
+  // chocolate ones, so the outline follows the whole puffy shape.
+  const clouds = [];
+  const puff = new THREE.CircleGeometry(1, 28);
+  const cloudCream = solid(COLORS.cream);
+  for (let i = 0; i < 4; i++) {
+    const cloud = new THREE.Group();
+    for (const [x, y, r] of [[0, 0, 1.6], [1.7, -0.2, 1.25], [-1.7, -0.3, 1.1], [0.8, 0.9, 1.15], [-0.7, 0.7, 0.95]]) {
+      const edge = new THREE.Mesh(puff, solid(COLORS.choc));
+      edge.position.set(x, y, 0);
+      edge.scale.setScalar(r + 0.16);
+      const fill = new THREE.Mesh(puff, cloudCream);
+      fill.position.set(x, y, 0.02);
+      fill.scale.setScalar(r);
+      cloud.add(edge, fill);
+    }
+    cloud.position.set(-40 + i * 24, 12 + (i % 2) * 5, GOAL_Z - 34 + (i % 2) * 3);
+    cloud.scale.setScalar(1 + (i % 3) * 0.35);
+    cloud.userData.speed = 0.6 + Math.random() * 0.7;
+    scene.add(cloud);
+    clouds.push(cloud);
+  }
+
+  // A few birds: ink ticks that flap as they cross the sky.
+  const birds = Array.from({ length: 6 }, (_, i) => {
+    const bird = new THREE.Group();
+    const wing = new THREE.BoxGeometry(0.7, 0.07, 0.02);
+    wing.translate(0.35, 0, 0);
+    const left = new THREE.Mesh(wing, solid(COLORS.choc));
+    const right = new THREE.Mesh(wing, solid(COLORS.choc));
+    right.rotation.y = Math.PI;
+    bird.add(left, right);
+    bird.position.set(-30 + i * 9, 15 + Math.random() * 6, GOAL_Z - 26 - Math.random() * 6);
+    bird.userData = { left, right, phase: Math.random() * 6, speed: 1.6 + Math.random() };
+    scene.add(bird);
+    return bird;
+  });
+
+  // ----- the pitch: mown stripes in two flat sages -----
   const stripe = new THREE.PlaneGeometry(40, 2.9);
   for (let i = 0; i < 12; i++) {
-    const band = new THREE.Mesh(stripe, solid(i % 2 ? 0x0f3d1f : 0x0b3118));
+    const band = new THREE.Mesh(stripe, solid(i % 2 ? 0xb3c3a0 : 0xa5b791));
     band.rotation.x = -Math.PI / 2;
     band.position.set(0, 0, 4 - i * 2.9);
     scene.add(band);
   }
-  const apron = new THREE.Mesh(new THREE.PlaneGeometry(60, 10), solid(0x092a14));
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(60, 10), solid(COLORS.sageMid));
   apron.rotation.x = -Math.PI / 2;
   apron.position.set(0, -0.01, GOAL_Z - 5);
   scene.add(apron);
 
-  // ----- line markings -----
-  const lines = [];
-  const segment = (x1, z1, x2, z2) => lines.push(x1, 0.02, z1, x2, 0.02, z2);
+  // ----- line markings, painted on as flat cream strips -----
+  const chalk = solid(COLORS.cream);
+  const segment = (x1, z1, x2, z2, width = 0.12) => {
+    const length = Math.hypot(x2 - x1, z2 - z1);
+    const strip = new THREE.Mesh(new THREE.PlaneGeometry(width, length + width), chalk);
+    strip.rotation.set(-Math.PI / 2, 0, -Math.atan2(x2 - x1, z2 - z1));
+    strip.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+    scene.add(strip);
+  };
   segment(-20, GOAL_Z, 20, GOAL_Z); // goal line
   segment(-9, GOAL_Z, -9, GOAL_Z + 8); // penalty box
   segment(9, GOAL_Z, 9, GOAL_Z + 8);
@@ -557,28 +688,29 @@ function stadiumScene(host, background) {
     if (prev) segment(prev[0], prev[1], p[0], p[1]);
     prev = p;
   }
-  const lineGeometry = new THREE.BufferGeometry();
-  lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
-  scene.add(new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: COLORS.white })));
-  const spotMark = new THREE.Mesh(new THREE.CircleGeometry(0.14, 12), solid(COLORS.white));
+  const spotMark = new THREE.Mesh(new THREE.CircleGeometry(0.16, 16), chalk);
   spotMark.rotation.x = -Math.PI / 2;
   spotMark.position.set(SPOT.x, 0.02, SPOT.z);
   scene.add(spotMark);
 
   // ----- the goal and its net -----
-  const postMaterial = flat(COLORS.white, { roughness: 0.3 });
-  const post = new THREE.CylinderGeometry(0.07, 0.07, GOAL_H, 8);
+  const postMaterial = flat(COLORS.cream);
+  const goalFrame = new THREE.Group();
+  const post = new THREE.CylinderGeometry(0.08, 0.08, GOAL_H, 10);
   for (const x of [-GOAL_W / 2, GOAL_W / 2]) {
     const p = new THREE.Mesh(post, postMaterial);
     p.position.set(x, GOAL_H / 2, GOAL_Z);
-    scene.add(p);
+    goalFrame.add(p);
   }
-  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, GOAL_W + 0.14, 8), postMaterial);
+  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, GOAL_W + 0.16, 10), postMaterial);
   crossbar.rotation.z = Math.PI / 2;
   crossbar.position.set(0, GOAL_H, GOAL_Z);
-  scene.add(crossbar);
+  goalFrame.add(crossbar);
+  scene.add(goalFrame);
+  outlines.push(...inked(goalFrame, 0.035));
 
-  const netMaterial = solid(COLORS.white, { wireframe: true, transparent: true, opacity: 0.4 });
+  // The net is drawn in fine ink lines.
+  const netMaterial = solid(COLORS.choc, { wireframe: true, transparent: true, opacity: 0.45 });
   const backNet = new THREE.Mesh(new THREE.PlaneGeometry(GOAL_W, GOAL_H, 16, 6), netMaterial);
   backNet.position.set(0, GOAL_H / 2, GOAL_Z - NET_DEPTH);
   scene.add(backNet);
@@ -595,18 +727,26 @@ function stadiumScene(host, background) {
   }
 
   // ----- the stands and the crowd -----
-  // Each fan remembers their seat height and their angle around the
-  // stadium, so a Mexican wave can travel round after a goal.
+  // The stands are chocolate paper-cut tiers, and the crowd is confetti
+  // dots in the house colours. Each fan remembers their seat height and
+  // their angle around the stadium, so a Mexican wave can travel round
+  // after a goal.
   const crowdPositions = [];
   const crowdColors = [];
   const crowdSeatY = [];
   const crowdAngle = [];
-  const crowdPalette = [COLORS.volt, COLORS.sports, COLORS.academic, COLORS.esports, COLORS.white, 0x555560].map((c) => new THREE.Color(c));
+  const crowdPalette = [COLORS.cream, COLORS.sage, COLORS.caramel, COLORS.paper, COLORS.sageMid, 0xe7d3b8].map((c) => new THREE.Color(c));
   const stadiumCentre = GOAL_Z + 6;
+  const tierMaterials = [solid(COLORS.choc), solid(0x55331f)];
+  const tierEdge = solid(COLORS.caramel);
   const tier = (i, w, d, x, y, z, along) => {
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), flat(i % 2 ? 0x17171d : 0x1d1d25));
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), tierMaterials[i % 2]);
     box.position.set(x, y, z);
     scene.add(box);
+    // A thin caramel lip along the front edge of every tier, like a printed highlight.
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(along === "x" ? w : 0.08, 0.08, along === "x" ? 0.08 : d), tierEdge);
+    lip.position.set(along === "x" ? x : x + (x < 0 ? 0.92 : -0.92), y + 0.56, along === "x" ? z + 0.92 : z);
+    scene.add(lip);
     const n = Math.floor((along === "x" ? w : d) * 3.2);
     for (let k = 0; k < n; k++) {
       const offset = (Math.random() - 0.5) * (along === "x" ? w : d);
@@ -627,38 +767,47 @@ function stadiumScene(host, background) {
   const crowdGeometry = new THREE.BufferGeometry();
   crowdGeometry.setAttribute("position", new THREE.Float32BufferAttribute(crowdPositions, 3));
   crowdGeometry.setAttribute("color", new THREE.Float32BufferAttribute(crowdColors, 3));
-  scene.add(new THREE.Points(crowdGeometry, new THREE.PointsMaterial({ size: 0.16, vertexColors: true })));
+  scene.add(new THREE.Points(crowdGeometry, new THREE.PointsMaterial({ size: 0.2, vertexColors: true })));
   const crowdBase = crowdColors.slice();
-  const flashes = []; // camera flashes in the crowd: { index, until }
+  const flashes = []; // fans waving flags: { index, until }
+  const flagColor = new THREE.Color(COLORS.sage);
   let waveStart = -Infinity;
 
-  // ----- floodlight towers, each throwing a flat cone of light -----
-  const beamGeometry = new THREE.ConeGeometry(4.5, 22, 20, 1, true);
-  beamGeometry.translate(0, -11, 0); // apex at the origin
-  beamGeometry.rotateX(-Math.PI / 2); // pointing along +z, so lookAt() aims it
-  const beamMaterial = solid(0xfff8d6, { transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide });
+  // ----- bunting: a string of pennants across the stand behind the goal -----
+  // They hang from a sagging string and flutter in the breeze.
+  const pennants = [];
+  const pennantShape = new THREE.Shape([new THREE.Vector2(-0.38, 0), new THREE.Vector2(0.38, 0), new THREE.Vector2(0, -0.95)]);
+  const pennantGeometry = new THREE.ShapeGeometry(pennantShape);
+  const pennantColors = [COLORS.sage, COLORS.cream, COLORS.caramel, COLORS.sageMid].map((c) => solid(c, { side: THREE.DoubleSide }));
+  const BUNTING_Y = 6.4;
+  const buntingZ = GOAL_Z - 4.2;
+  const sag = (x) => BUNTING_Y - 1.4 * (1 - (x / 22) ** 2);
+  const stringPoints = [];
+  for (let x = -22; x <= 22; x += 1) stringPoints.push(new THREE.Vector3(x, sag(x), buntingZ));
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(stringPoints), new THREE.LineBasicMaterial({ color: COLORS.choc })));
+  for (let x = -21; x <= 21; x += 1.05) {
+    const flag = new THREE.Mesh(pennantGeometry, pennantColors[pennants.length % pennantColors.length]);
+    flag.position.set(x, sag(x), buntingZ);
+    flag.userData.phase = x * 0.5;
+    scene.add(flag);
+    pennants.push(flag);
+  }
+
+  // ----- floodlight towers, silhouetted in chocolate -----
   for (const [x, z] of [[-16, GOAL_Z - 10], [16, GOAL_Z - 10], [-22, GOAL_Z + 6], [22, GOAL_Z + 6]]) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 15, 6), flat(0x2a2a33));
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 15, 6), solid(COLORS.choc));
     pole.position.set(x, 7.5, z);
     scene.add(pole);
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(3, 1.6, 0.3), solid(0xfffbe6));
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(3, 1.6, 0.3), solid(COLORS.cream));
     lamp.position.set(x, 15.2, z);
     lamp.lookAt(0, 0, GOAL_Z + 4);
     scene.add(lamp);
-    const beam = new THREE.Mesh(beamGeometry, beamMaterial);
-    beam.position.copy(lamp.position);
-    beam.lookAt(x * 0.3, 0, GOAL_Z + 3);
-    scene.add(beam);
+    const lampEdge = new THREE.Mesh(new THREE.BoxGeometry(3.3, 1.9, 0.2), solid(COLORS.choc));
+    lampEdge.position.set(0, 0, -0.1);
+    lamp.add(lampEdge);
   }
 
-  // ----- a starry sky (square points, no texture) -----
-  const starPositions = [];
-  for (let i = 0; i < 500; i++) starPositions.push((Math.random() - 0.5) * 140, 14 + Math.random() * 40, GOAL_Z - 30 - Math.random() * 30);
-  const starGeometry = new THREE.BufferGeometry();
-  starGeometry.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
-  scene.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: COLORS.white, size: 0.18 })));
-
-  // ----- fireworks: a pool of square sparks that burst over the stands -----
+  // ----- confetti bursts: a pool of paper squares that pop over the stands -----
   const SPARKS = 480;
   const sparkPositions = new Float32Array(SPARKS * 3).fill(-999);
   const sparkColors = new Float32Array(SPARKS * 3);
@@ -666,7 +815,7 @@ function stadiumScene(host, background) {
   const sparkGeometry = new THREE.BufferGeometry();
   sparkGeometry.setAttribute("position", new THREE.BufferAttribute(sparkPositions, 3));
   sparkGeometry.setAttribute("color", new THREE.BufferAttribute(sparkColors, 3));
-  scene.add(new THREE.Points(sparkGeometry, new THREE.PointsMaterial({ size: 0.3, vertexColors: true })));
+  scene.add(new THREE.Points(sparkGeometry, new THREE.PointsMaterial({ size: 0.38, vertexColors: true })));
   let nextSpark = 0;
 
   const firework = (origin, color) => {
@@ -685,20 +834,28 @@ function stadiumScene(host, background) {
   const keeper = makeKeeperBot();
   keeper.root.position.z = GOAL_Z + 0.5;
   scene.add(keeper.root);
+  outlines.push(...keeper.outlines);
+  const keeperShadow = new THREE.Mesh(new THREE.CircleGeometry(0.7, 20), solid(COLORS.choc, { transparent: true, opacity: 0.22, depthWrite: false }));
+  keeperShadow.rotation.x = -Math.PI / 2;
+  keeperShadow.scale.y = 0.45;
+  keeperShadow.position.set(0, 0.025, GOAL_Z + 0.5);
+  scene.add(keeperShadow);
 
   // ----- the ball, its shadow, its trail and the aiming ring -----
   const ball = KIT.football();
+  outlines.push(...inked(ball, 0.07));
   ball.scale.setScalar(BALL_R);
   ball.position.copy(SPOT);
   scene.add(ball);
 
-  const shadow = new THREE.Mesh(new THREE.CircleGeometry(BALL_R * 1.1, 16), solid(0x000000, { transparent: true, opacity: 0.45, depthWrite: false }));
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(BALL_R * 1.1, 16), solid(COLORS.choc, { transparent: true, opacity: 0.3, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2;
   scene.add(shadow);
 
-  // The trail is a row of shrinking yellow ghosts of the ball.
+  // The trail is a row of shrinking sage ghosts of the ball, like the
+  // motion marks behind a ball in a comic.
   const trailGeometry = new THREE.IcosahedronGeometry(BALL_R, 1);
-  const trailMaterial = solid(COLORS.volt, { transparent: true, opacity: 0.35, depthWrite: false });
+  const trailMaterial = solid(COLORS.sageMid, { transparent: true, opacity: 0.5, depthWrite: false });
   const trail = Array.from({ length: 10 }, (_, i) => {
     const ghost = new THREE.Mesh(trailGeometry, trailMaterial);
     ghost.scale.setScalar(0.85 - i * 0.07);
@@ -708,8 +865,11 @@ function stadiumScene(host, background) {
   });
   const history = [];
 
-  const aimRing = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.36, 28), solid(COLORS.volt, { transparent: true, opacity: 0.95, depthTest: false }));
+  const aimRing = new THREE.Mesh(new THREE.RingGeometry(0.26, 0.36, 28), solid(COLORS.choc, { transparent: true, opacity: 0.9, depthTest: false }));
   aimRing.renderOrder = 10;
+  const aimDot = new THREE.Mesh(new THREE.CircleGeometry(0.1, 16), solid(COLORS.caramel, { depthTest: false }));
+  aimDot.renderOrder = 11;
+  aimRing.add(aimDot);
   scene.add(aimRing);
   const aim = new THREE.Vector3(1.6, 1.2, GOAL_Z);
 
@@ -863,11 +1023,11 @@ function stadiumScene(host, background) {
       slowmoUntil = now + 1100;
       replayUntil = now + 2000;
       slowmoTag?.classList.add("on");
-      // ...the crowd stands up in a wave, with camera flashes everywhere...
+      // ...the crowd stands up in a wave, waving sage flags everywhere...
       waveStart = now;
       for (let i = 0; i < 90; i++) flashes.push({ index: (Math.random() * (crowdPositions.length / 3)) | 0, until: now + 150 + Math.random() * 1200 });
-      // ...and fireworks go up over the stands.
-      [COLORS.volt, COLORS.sports, COLORS.esports, COLORS.academic, COLORS.volt].forEach((color, i) => {
+      // ...and confetti pops over the stands.
+      [COLORS.sage, COLORS.caramel, COLORS.choc, COLORS.moss, COLORS.cream].forEach((color, i) => {
         setTimeout(() => firework(new THREE.Vector3((Math.random() - 0.5) * 30, 12 + Math.random() * 6, GOAL_Z - 8 - Math.random() * 6), color), 250 + i * 260);
       });
     }
@@ -933,6 +1093,7 @@ function stadiumScene(host, background) {
   const wantPosition = new THREE.Vector3();
   const wantLook = new THREE.Vector3();
 
+  let lastBoil = 0;
   const { start, stop } = loop(tick);
   new IntersectionObserver(([entry]) => (entry.isIntersecting ? start() : stop())).observe(host);
 
@@ -1008,13 +1169,16 @@ function stadiumScene(host, background) {
     }
     net.needsUpdate = true;
 
-    // The crowd: camera flashes all the time, and a Mexican wave after a goal.
+    // The crowd: fans wave sage flags now and then, and do a Mexican wave
+    // after a goal.
     const colors = crowdGeometry.attributes.color;
-    if (Math.random() < 0.5) flashes.push({ index: (Math.random() * colors.count) | 0, until: now + 120 });
+    if (Math.random() < 0.5) flashes.push({ index: (Math.random() * colors.count) | 0, until: now + 220 });
     for (let i = flashes.length - 1; i >= 0; i--) {
       const f = flashes[i];
       const done = now > f.until;
-      for (let c = 0; c < 3; c++) colors.array[f.index * 3 + c] = done ? crowdBase[f.index * 3 + c] : 1;
+      colors.array[f.index * 3] = done ? crowdBase[f.index * 3] : flagColor.r;
+      colors.array[f.index * 3 + 1] = done ? crowdBase[f.index * 3 + 1] : flagColor.g;
+      colors.array[f.index * 3 + 2] = done ? crowdBase[f.index * 3 + 2] : flagColor.b;
       if (done) flashes.splice(i, 1);
     }
     colors.needsUpdate = true;
@@ -1030,13 +1194,14 @@ function stadiumScene(host, background) {
       positions.needsUpdate = true;
     }
 
-    // Fireworks: sparks fly out, fall and fade by shrinking out of sight.
+    // Confetti: the squares fly out, flutter down and drop out of sight.
     for (let i = 0; i < SPARKS; i++) {
       const s = sparks[i];
       if (s.life <= 0) continue;
       s.life -= realDt;
       s.velocity.y -= 6 * realDt;
-      s.velocity.multiplyScalar(0.985);
+      s.velocity.multiplyScalar(0.975);
+      s.velocity.x += Math.sin(t * 7 + i) * 0.05; // a little flutter
       sparkPositions[i * 3] += s.velocity.x * realDt;
       sparkPositions[i * 3 + 1] += s.velocity.y * realDt;
       sparkPositions[i * 3 + 2] += s.velocity.z * realDt;
@@ -1044,6 +1209,36 @@ function stadiumScene(host, background) {
     }
     sparkGeometry.attributes.position.needsUpdate = true;
     sparkGeometry.attributes.color.needsUpdate = true;
+
+    // The sky drifts: the sunburst turns, clouds float by, birds flap past
+    // and the bunting flutters.
+    rays.rotation.z += realDt * 0.025;
+    for (const cloud of clouds) {
+      cloud.position.x += cloud.userData.speed * realDt;
+      if (cloud.position.x > 48) cloud.position.x = -48;
+    }
+    for (const bird of birds) {
+      const u = bird.userData;
+      bird.position.x += u.speed * realDt;
+      bird.position.y += Math.sin(t * 0.8 + u.phase) * 0.004;
+      if (bird.position.x > 40) bird.position.x = -40;
+      const flap = Math.sin(t * 9 + u.phase) * 0.55;
+      // The right wing is the left one turned round, so both use the same angle.
+      u.left.rotation.z = 0.35 + flap;
+      u.right.rotation.z = 0.35 + flap;
+    }
+    for (const flag of pennants) {
+      flag.rotation.x = Math.sin(t * 2.6 + flag.userData.phase) * 0.45 - 0.15;
+      flag.rotation.z = Math.sin(t * 1.9 + flag.userData.phase) * 0.12;
+    }
+
+    // The ink outlines are redrawn about eight times a second.
+    if (t - lastBoil > 0.125) {
+      lastBoil = t;
+      boil(outlines);
+    }
+
+    keeperShadow.position.x = keeper.root.position.x;
 
     aimRing.position.set(aim.x, aim.y, GOAL_Z + 0.05);
     aimRing.scale.setScalar(1 + Math.sin(t * 6) * 0.08);
