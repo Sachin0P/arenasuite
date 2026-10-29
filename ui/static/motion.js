@@ -9,7 +9,7 @@
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const finePointer = matchMedia("(pointer: fine)").matches;
 
-const PALETTE = ["#ffe600", "#c6ff00", "#5b8cff", "#ff2e88", "#f4f4ef"];
+const PALETTE = ["#aebf9a", "#3e2519", "#d2a77a", "#587548", "#fbf8f1"]; // sage, chocolate, caramel, moss, cream
 
 // ---------- text scramble ----------
 // The headline briefly cycles through random characters before settling.

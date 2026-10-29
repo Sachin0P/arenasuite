@@ -2,7 +2,7 @@
 
 {{define "main"}}
 <section class="hero">
-  {{/* fx.js draws the floodlit stadium and runs the penalty game in here. */}}
+  {{/* fx.js draws the poster-style stadium and runs the penalty game in here. */}}
   <div class="hero-stage" id="hero-stage" aria-hidden="true"></div>
   <div class="scoreboard" aria-hidden="true">
     <span class="sb-label">Goals</span><span></span><span class="sb-label">Shots</span>
@@ -10,6 +10,7 @@
     <span class="sb-clock" id="sb-clock">Kick-off</span>
   </div>
   <div class="goal-burst" id="goal-burst" aria-hidden="true"></div>
+  <div class="slowmo-tag" id="slowmo-tag" aria-hidden="true">Slow-mo replay</div>
   <div class="container hero-copy">
     <p class="kicker">// Matchday {{.CurrentYear}} · Thapar campus</p>
     <h1><span class="line">Compete.</span><span class="line">Connect.</span><span class="line">Win.</span></h1>
@@ -18,7 +19,7 @@
       <a href="/competitions" class="btn btn-primary">Explore Competitions</a>
       <a href="/organize" class="btn">Organize an Event</a>
     </div>
-    <p class="hint tiny-text"><b>Move</b> to aim · <b>click</b> to take a penalty</p>
+    <p class="hint tiny-text"><b>Move</b> to aim · <b>click</b> to shoot · beat <b>KEEPER-BOT</b></p>
   </div>
 </section>
 
