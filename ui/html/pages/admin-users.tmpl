@@ -1,0 +1,56 @@
+{{define "title"}}Users{{end}}
+
+{{define "main"}}
+<div class="container page shell">
+  {{template "admin-side" $.Section}}
+  <div>
+    <h1 class="mb">Users</h1>
+    <form method="get" class="inputs-row mb">
+      <input name="q" value="{{$.Q}}" placeholder="Search name or email" style="flex:1;min-width:180px">
+      <select name="role">
+        <option value="">All roles</option>
+        {{range roles}}<option value="{{.}}" {{if eq . $.Role}}selected{{end}}>{{label .}}</option>{{end}}
+      </select>
+      <select name="status">
+        <option value="">Any status</option>
+        <option value="active" {{if eq $.Status "active"}}selected{{end}}>Active</option>
+        <option value="suspended" {{if eq $.Status "suspended"}}selected{{end}}>Suspended</option>
+      </select>
+      <button class="btn">Filter</button>
+    </form>
+
+    {{if $.Users}}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {{range $.Users}}
+          <tr>
+            <td class="bold">{{.Name}}<div class="tiny-text muted">{{.RollNumber}} {{.Branch}}</div></td>
+            <td class="muted">{{.Email}}</td>
+            <td>
+              <form method="post" action="/admin/users/{{.ID}}/role" class="row">
+                {{$role := .Role}}
+                <select name="role" style="width:auto">{{range roles}}<option value="{{.}}" {{if eq . $role}}selected{{end}}>{{.}}</option>{{end}}</select>
+                <button class="btn btn-sm">Save</button>
+              </form>
+            </td>
+            <td>{{template "status" .Status}}</td>
+            <td class="right">
+              {{if ne .ID $.User.ID}}
+                {{if eq .Status "active"}}
+                  <form method="post" action="/admin/users/{{.ID}}/status" data-confirm="Suspend {{.Name}}?"><input type="hidden" name="status" value="suspended"><button class="link-btn danger">Suspend</button></form>
+                {{else}}
+                  <form method="post" action="/admin/users/{{.ID}}/status"><input type="hidden" name="status" value="active"><button class="link-btn">Unsuspend</button></form>
+                {{end}}
+              {{end}}
+            </td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}{{template "empty" dict "Title" "No users match"}}{{end}}
+  </div>
+</div>
+{{end}}

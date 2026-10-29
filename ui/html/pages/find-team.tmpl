@@ -1,0 +1,94 @@
+{{define "title"}}Find a Team{{end}}
+
+{{define "main"}}
+<div class="container page">
+  <h1>Find a Team</h1>
+  <p class="muted mb">Browse teams that need players, or let teams find you.</p>
+
+  {{/* Two tabs, done as links (?tab=...) because each loads different data. */}}
+  <nav class="tabs">
+    <a href="/find-team" {{if eq $.Tab "teams"}}class="active"{{end}}>Teams Looking for Members</a>
+    <a href="/find-team?tab=players" {{if eq $.Tab "players"}}class="active"{{end}}>Players Looking for a Team</a>
+  </nav>
+
+  <div class="row mb">
+    <form method="get" class="inputs-row" style="flex:1">
+      <input type="hidden" name="tab" value="{{$.Tab}}">
+      <select name="competitionId">
+        <option value="">All competitions</option>
+        {{range $.Competitions}}<option value="{{.ID}}" {{if eq .ID $.FindFilter.CompetitionID}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+      <select name="category">
+        <option value="">All categories</option>
+        {{range categories}}<option value="{{.}}" {{if eq . $.FindFilter.Category}}selected{{end}}>{{label (lower .)}}</option>{{end}}
+      </select>
+      <input name="role" value="{{$.FindFilter.Role}}" placeholder="Role or skill..." style="width:200px">
+      <button class="btn">Filter</button>
+    </form>
+    {{if and (eq $.Tab "players") $.User}}
+      <button type="button" class="btn btn-primary" data-reveal="#post-form">I need a team</button>
+    {{end}}
+  </div>
+
+  {{if $.User}}
+  <form method="post" action="/find-team/posts" id="post-form" class="card stack mb" hidden>
+    <div class="grid form">
+      <select name="competitionId" required>
+        <option value="">Select competition</option>
+        {{range $.Competitions}}{{if not (.OrganizedBy $.User)}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+      </select>
+      <input name="role" placeholder="Role you want (e.g. Backend Developer)" required>
+      <input name="skills" placeholder="Skills (e.g. Go, SQL)">
+      <select name="experience">
+        <option value="">Experience level</option>
+        <option>Beginner</option><option>Intermediate</option><option>Advanced</option>
+      </select>
+    </div>
+    <textarea name="description" rows="2" placeholder="Tell teams a bit about yourself..."></textarea>
+    <div><button class="btn btn-primary">Post</button></div>
+  </form>
+  {{end}}
+
+  {{if eq $.Tab "teams"}}
+    {{if $.Teams}}
+      <div class="grid">{{range $.Teams}}{{template "team-card" dict "Team" . "User" $.User "Requests" $.MyRequests}}{{end}}</div>
+    {{else}}{{template "empty" dict "Title" "No teams looking for members right now"}}{{end}}
+  {{else}}
+    {{if $.Posts}}
+    <div class="grid">
+      {{range $p := $.Posts}}
+      <div class="card">
+        <div class="row">
+          {{if $p.ProfilePicture}}<img src="{{$p.ProfilePicture}}" alt="" class="avatar">{{else}}<span class="avatar light">{{initial $p.UserName}}</span>{{end}}
+          <b>{{$p.UserName}}</b>
+        </div>
+        <p class="tiny-text muted mt">{{$p.CompetitionName}}</p>
+        <p class="small mt">Looking for: <b>{{$p.Role}}</b></p>
+        {{with $p.Skills}}<p class="tiny-text muted">Skills: {{.}}</p>{{end}}
+        {{with $p.Experience}}<p class="tiny-text muted">Experience: {{.}}</p>{{end}}
+        {{with $p.Description}}<p class="small mt">{{.}}</p>{{end}}
+
+        {{if $.User}}
+          {{if eq $p.UserID $.User.ID}}
+            <form method="post" action="/find-team/posts/{{$p.ID}}/delete" class="mt" data-confirm="Remove your post?">
+              <button class="btn btn-sm btn-block">Remove my post</button>
+            </form>
+          {{else}}
+            {{/* Captains can invite this person into one of their teams in the same competition. */}}
+            <div class="stack mt">
+              {{range $.CaptainOf}}{{if eq .CompetitionID $p.CompetitionID}}
+                <form method="post" action="/teams/{{.ID}}/invite">
+                  <input type="hidden" name="userId" value="{{$p.UserID}}">
+                  <button class="btn btn-sm btn-block">Invite to "{{.Name}}"</button>
+                </form>
+              {{end}}{{end}}
+            </div>
+          {{end}}
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{else}}{{template "empty" dict "Title" "No one is looking for a team right now"}}{{end}}
+  {{end}}
+</div>
+{{end}}

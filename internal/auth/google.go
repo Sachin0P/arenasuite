@@ -1,6 +1,8 @@
+// Package auth signs users in with Google.
 package auth
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -117,4 +119,9 @@ func (g *Google) Exchange(code string) (*GoogleUser, error) {
 		return nil, errors.New("ID token has expired")
 	}
 	return &user, nil
+}
+
+// NewState returns a random URL-safe string for the OAuth "state" parameter.
+func NewState() string {
+	return rand.Text()
 }

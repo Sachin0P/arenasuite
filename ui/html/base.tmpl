@@ -1,0 +1,27 @@
+{{/* The page frame shared by every page. Each page defines "title" and "main". */}}
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{template "title" .}} · ArenaSuite</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body {{if .User}}data-user="1"{{end}} {{with .LiveID}}data-competition="{{.}}"{{end}}>
+  {{template "nav" .}}
+
+  <main>{{template "main" .}}</main>
+
+  <footer class="site"><div class="container">ArenaSuite · college competitions in one place</div></footer>
+
+  <div id="toasts" class="toasts"></div>
+  {{with .FlashError}}<div id="flash" hidden data-kind="error" data-msg="{{.}}"></div>
+  {{else}}{{with .Flash}}<div id="flash" hidden data-kind="success" data-msg="{{.}}"></div>{{end}}{{end}}
+  <noscript>
+    {{with .FlashError}}<div class="container"><p class="notice error">{{.}}</p></div>{{end}}
+    {{with .Flash}}<div class="container"><p class="notice green">{{.}}</p></div>{{end}}
+  </noscript>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+{{end}}

@@ -23,8 +23,6 @@ services:
         sync: false
       - key: ADMIN_EMAILS      # your email, so you become admin on first sign-in
         sync: false
-      - key: SESSION_SECRET    # Render generates a random one
-        generateValue: true
       - key: TIMEZONE
         value: Asia/Kolkata
       - key: ALLOWED_EMAIL_DOMAIN

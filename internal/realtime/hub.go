@@ -13,7 +13,7 @@ package realtime
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -45,7 +45,7 @@ func CompetitionRoom(compID int64) string { return fmt.Sprintf("competition:%d",
 func (h *Hub) Send(room, name string, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("realtime: cannot encode %s: %v", name, err)
+		slog.Error("realtime: cannot encode event", "event", name, "error", err)
 		return
 	}
 	h.mu.Lock()
@@ -85,11 +85,11 @@ func (h *Hub) leave(c *client, rooms []string) {
 // Serve keeps the HTTP response open and streams events from the given rooms
 // until the browser disconnects.
 func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, rooms []string) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
+	// Use a ResponseController rather than asserting w.(http.Flusher): it
+	// finds the Flush method even when middleware (like the session manager)
+	// has wrapped the ResponseWriter.
+	rc := http.NewResponseController(w)
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -103,7 +103,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, rooms []string) {
 	defer ping.Stop()
 
 	fmt.Fprint(w, ": connected\n\n")
-	flusher.Flush()
+	rc.Flush()
 
 	for {
 		select {
@@ -111,11 +111,11 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, rooms []string) {
 			return
 		case <-ping.C:
 			fmt.Fprint(w, ": ping\n\n")
-			flusher.Flush()
+			rc.Flush()
 		case ev := <-c.events:
 			// SSE wire format: "event: <name>\ndata: <json>\n\n"
 			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.Name, ev.Data)
-			flusher.Flush()
+			rc.Flush()
 		}
 	}
 }

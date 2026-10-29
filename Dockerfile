@@ -4,11 +4,12 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /arenasuite .
+RUN CGO_ENABLED=0 go build -ldflags="-s" -o /arenasuite ./cmd/web
 
 # --- Stage 2: tiny image with just the binary ---
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /arenasuite /arenasuite
-# Settings (DATABASE_URL, SESSION_SECRET, ...) come from the host's environment.
+# Settings (DATABASE_URL, BASE_URL, ...) come from the host's environment;
+# each command-line flag of cmd/web defaults to one of these variables.
 EXPOSE 4000
 ENTRYPOINT ["/arenasuite"]

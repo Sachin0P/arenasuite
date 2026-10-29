@@ -1,0 +1,24 @@
+{{define "title"}}{{.Org.Name}}{{end}}
+
+{{define "main"}}
+{{$o := .Org}}
+<div class="container page stack-lg">
+  <div class="row" style="gap:16px">
+    {{if $o.Logo}}<img src="{{$o.Logo}}" alt="" class="avatar big">{{else}}<span class="avatar big">{{initial $o.Name}}</span>{{end}}
+    <div>
+      <h1>{{$o.Name}} {{if $o.Verified}}<span class="pill green">verified</span>{{end}}</h1>
+      <p class="muted">{{with $o.College}}{{.}} · {{end}}{{$o.CompetitionsCount}} {{plural $o.CompetitionsCount "competition" "competitions"}}</p>
+    </div>
+  </div>
+  {{with $o.Description}}<p class="pre">{{.}}</p>{{end}}
+
+  <section>
+    <h2 class="mb">Upcoming Competitions</h2>
+    {{template "comp-grid" .UpcomingCompetitions}}
+  </section>
+  <section>
+    <h2 class="mb">Past Competitions</h2>
+    {{template "comp-grid" .PastCompetitions}}
+  </section>
+</div>
+{{end}}

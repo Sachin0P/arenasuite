@@ -1,0 +1,33 @@
+{{define "title"}}Sign in{{end}}
+
+{{define "main"}}
+<div class="container tiny page stack-lg" style="text-align:center">
+  <div>
+    <h1>Sign in to ArenaSuite</h1>
+    <p class="muted mt">Use your <b>@{{$.Domain}}</b> Google account.</p>
+  </div>
+
+  {{if $.GoogleReady}}
+    <a href="/auth/google" class="btn btn-block">Continue with Google</a>
+  {{else}}
+    <p class="notice">Google sign-in isn't configured yet. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.</p>
+  {{end}}
+
+  {{/* Development only (DEV_LOGIN=true): sign in as any user without Google. */}}
+  {{if $.DevLogin}}
+  <div class="card stack" style="text-align:left">
+    <p class="bold">Dev login <span class="pill amber">DEV_LOGIN is on</span></p>
+    {{if $.Users}}
+    <form method="post" action="/auth/dev-login" class="inputs-row">
+      <select name="userId" style="flex:1">
+        {{range $.Users}}<option value="{{.ID}}">{{.Name}} · {{.Role}} · {{.Email}}</option>{{end}}
+      </select>
+      <button class="btn btn-primary">Sign in</button>
+    </form>
+    {{else}}
+    <p class="small muted">No users yet. Run <code>go run ./cmd/seed</code> to add sample users.</p>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}

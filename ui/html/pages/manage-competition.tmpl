@@ -1,0 +1,176 @@
+{{define "title"}}Manage {{.Competition.Name}}{{end}}
+
+{{define "main"}}
+{{$c := $.Competition}}
+<div class="container page shell">
+  {{template "organizer-side" $.Section}}
+  <div>
+    <a href="/organizer/competitions" class="small muted">&larr; My Competitions</a>
+    <div class="row between mt">
+      <div>
+        <div class="row">{{template "cat" $c.Category}} {{template "status" $c.Status}}</div>
+        <h1 class="mt">{{$c.Name}}</h1>
+      </div>
+      <div class="row">
+        <a href="/competitions/{{$c.ID}}" class="btn btn-sm">View public page</a>
+        <a href="/organizer/competitions/{{$c.ID}}/edit" class="btn btn-sm">Edit details</a>
+        <form method="post" action="/competitions/{{$c.ID}}/status" class="row">
+          <select name="status" style="width:auto">
+            <option value="draft" {{if eq $c.Status "draft"}}selected{{end}}>Draft</option>
+            <option value="published" {{if eq $c.Status "published"}}selected{{end}}>Published</option>
+            <option value="ongoing" {{if eq $c.Status "ongoing"}}selected{{end}}>Ongoing</option>
+            <option value="completed" {{if eq $c.Status "completed"}}selected{{end}}>Completed</option>
+            <option value="cancelled" {{if eq $c.Status "cancelled"}}selected{{end}}>Cancelled</option>
+          </select>
+          <button class="btn btn-sm">Set status</button>
+        </form>
+      </div>
+    </div>
+
+    <nav class="tabs mt" data-tabs>
+      <a href="#registrations">Registrations</a>
+      <a href="#teams">Teams</a>
+      <a href="#matches">Fixtures & Live Scores</a>
+      <a href="#standings">Standings</a>
+      <a href="#announcements">Announcements</a>
+    </nav>
+
+    <section class="tab-panel" id="tab-registrations" data-live>
+      {{if $.Registrations}}
+      <div class="list">
+        {{range $.Registrations}}
+        <div class="list-row">
+          <div>
+            <b>{{or .TeamName .RegistrantName}}</b>{{if .TeamID}} <span class="pill">team</span>{{end}}
+            <p class="tiny-text muted">{{.RegistrantName}} · {{.RegistrantEmail}} · {{humanDateTime .RegisteredAt}}</p>
+          </div>
+          <div class="row">
+            {{template "status" .Status}}
+            {{if eq .Status "pending"}}
+              <form method="post" action="/registrations/{{.ID}}/approve" class="inline"><button class="btn btn-primary btn-sm">Approve</button></form>
+              <form method="post" action="/registrations/{{.ID}}/reject" class="inline"><button class="btn btn-sm">Reject</button></form>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+      {{else}}{{template "empty" dict "Title" "No registrations yet"}}{{end}}
+    </section>
+
+    <section class="tab-panel" id="tab-teams">
+      {{if $.Teams}}
+      <div class="grid">
+        {{range $.Teams}}
+        <a href="/teams/{{.ID}}" class="card">
+          <b>{{.Name}}</b>
+          <p class="tiny-text muted">Captain: {{.CaptainName}} · {{.MemberCount}}/{{.Capacity}} members</p>
+        </a>
+        {{end}}
+      </div>
+      {{else}}{{template "empty" dict "Title" "No teams yet"}}{{end}}
+    </section>
+
+    <section class="tab-panel stack-lg" id="tab-matches">
+      <div class="row">
+        <form method="post" action="/competitions/{{$c.ID}}/matches/generate" class="inline"
+              {{if $.Matches}}data-confirm="Replace all existing fixtures? Only possible while no match is live or completed."{{end}}>
+          {{if $.Matches}}<input type="hidden" name="regenerate" value="true">{{end}}
+          <button class="btn btn-primary btn-sm">{{if $.Matches}}Regenerate Fixtures{{else}}Generate Fixtures{{end}}</button>
+        </form>
+        <span class="tiny-text muted">Uses approved teams · {{if $c.IsKnockout}}seeded knockout bracket{{else}}round robin{{end}}</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-sm" data-reveal="#add-match">+ Add match manually</button>
+      </div>
+
+      <form method="post" action="/competitions/{{$c.ID}}/matches" id="add-match" class="card inputs-row" hidden>
+        <input name="round" placeholder="Round (e.g. Group A)" required>
+        <select name="teamAId"><option value="">Team A (TBD)</option>{{range $.Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select>
+        <select name="teamBId"><option value="">Team B (TBD)</option>{{range $.Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select>
+        <input type="datetime-local" name="scheduledAt">
+        <input name="venue" placeholder="Venue">
+        <button class="btn btn-primary btn-sm">Add</button>
+      </form>
+
+      {{if $.Matches}}
+      <div class="list">
+        {{range $.Matches}}
+        {{/* Saving a row is what pushes live updates to the public page. */}}
+        <div class="card">
+          <form method="post" action="/matches/{{.ID}}" class="stack">
+            <div class="row between tiny-text faint"><span>{{.Round}}</span>{{if .WinnerName}}{{if eq .Status "completed"}}<span class="accent bold" data-category="SPORTS">{{.WinnerName}} won</span>{{end}}{{end}}</div>
+            <div class="inputs-row">
+              <b style="min-width:110px">{{or .TeamAName "TBD"}}</b>
+              <input type="number" name="scoreA" class="score" value="{{with .ScoreA}}{{.}}{{end}}">
+              <span class="faint">–</span>
+              <input type="number" name="scoreB" class="score" value="{{with .ScoreB}}{{.}}{{end}}">
+              <b style="min-width:110px">{{or .TeamBName "TBD"}}</b>
+              <select name="status">
+                {{$st := .Status}}
+                <option value="scheduled" {{if eq $st "scheduled"}}selected{{end}}>Scheduled</option>
+                <option value="live" {{if eq $st "live"}}selected{{end}}>Live</option>
+                <option value="completed" {{if eq $st "completed"}}selected{{end}}>Completed</option>
+                <option value="postponed" {{if eq $st "postponed"}}selected{{end}}>Postponed</option>
+                <option value="cancelled" {{if eq $st "cancelled"}}selected{{end}}>Cancelled</option>
+              </select>
+            </div>
+            <div class="inputs-row">
+              <input type="datetime-local" name="scheduledAt" value="{{with .ScheduledAt}}{{inputDateTime .}}{{end}}">
+              <input name="venue" value="{{.Venue}}" placeholder="Venue">
+              <button class="btn btn-primary btn-sm">Save</button>
+            </div>
+          </form>
+          <form method="post" action="/matches/{{.ID}}/delete" class="row end" data-confirm="Delete this match?">
+            <button class="link-btn danger">Delete match</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+      {{else}}{{template "empty" dict "Title" "No fixtures yet" "Sub" "Approve team registrations, then generate fixtures."}}{{end}}
+    </section>
+
+    <section class="tab-panel stack-lg" id="tab-standings">
+      {{if eq $c.Category "ACADEMIC"}}
+        {{/* Academic: no matches, the organizer enters each team's score. */}}
+        <form method="post" action="/competitions/{{$c.ID}}/standings/score" class="card inputs-row">
+          <label class="field"><span>Team</span>
+            <select name="teamId" required><option value="">Select team</option>{{range $.Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select>
+          </label>
+          <label class="field"><span>Score</span><input type="number" name="points" required style="width:110px"></label>
+          <button class="btn btn-primary">Save Score</button>
+        </form>
+      {{else}}
+        <form method="post" action="/competitions/{{$c.ID}}/standings/recompute">
+          <button class="btn btn-sm">Recalculate from match results</button>
+        </form>
+      {{end}}
+      {{template "standings" dict "Rows" $.Standings "Academic" (eq $c.Category "ACADEMIC")}}
+    </section>
+
+    <section class="tab-panel" id="tab-announcements">
+      <form method="post" action="/competitions/{{$c.ID}}/announcements" class="card stack mb">
+        <input name="title" placeholder="Title" required>
+        <textarea name="message" rows="2" placeholder="Message" required></textarea>
+        <div><button class="btn btn-primary btn-sm">Publish Announcement</button></div>
+      </form>
+      {{if $.Announcements}}
+      <div class="list">
+        {{range $.Announcements}}
+        <div class="card">
+          <div class="row between"><b>{{.Title}}</b><span class="tiny-text faint">{{humanDateTime .CreatedAt}}</span></div>
+          <p class="pre small mt">{{.Message}}</p>
+          <form method="post" action="/announcements/{{.ID}}/delete" class="row end" data-confirm="Delete this announcement?">
+            <button class="link-btn danger">Delete</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+      {{else}}{{template "empty" dict "Title" "No announcements yet"}}{{end}}
+    </section>
+
+    <form method="post" action="/competitions/{{$c.ID}}/delete" class="mt-lg"
+          data-confirm="Delete {{$c.Name}} and everything in it (teams, matches, registrations)? This cannot be undone.">
+      <button class="link-btn danger">Delete competition</button>
+    </form>
+  </div>
+</div>
+{{end}}
