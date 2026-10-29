@@ -2,27 +2,36 @@
 
 {{define "main"}}
 <section class="hero">
-  <h1>COMPETE. CONNECT. WIN.</h1>
-  <p>Discover and participate in college competitions — all in one place.</p>
-  <div class="row" style="justify-content:center">
-    <a href="/competitions" class="btn btn-primary">Explore Competitions</a>
-    <a href="/organize" class="btn">Organize an Event</a>
+  {{/* fx.js draws the 3D orb in here. */}}
+  <div class="hero-stage" id="hero-stage" aria-hidden="true"></div>
+  <div class="container hero-copy">
+    <p class="kicker">// Thapar campus · season {{.CurrentYear}}</p>
+    <h1><span class="line">Compete.</span><span class="line">Connect.</span><span class="line">Win.</span></h1>
+    <p class="lede">Discover and participate in college competitions — all in one place.</p>
+    <div class="row">
+      <a href="/competitions" class="btn btn-primary">Explore Competitions</a>
+      <a href="/organize" class="btn">Organize an Event</a>
+    </div>
+    <p class="hint tiny-text"><b>Drag</b> the orb to spin it · <b>click</b> to smash it</p>
   </div>
 </section>
 
 <div class="container page stack-lg">
   <div class="grid">
     <a href="/sports" class="card category-card" data-category="SPORTS">
+      <span class="cat-index">01 / 03</span>
       <h2>Sports</h2>
       <p class="small muted">Cricket, football, basketball & more</p>
       <span class="accent">Explore Sports &rarr;</span>
     </a>
     <a href="/academic" class="card category-card" data-category="ACADEMIC">
+      <span class="cat-index">02 / 03</span>
       <h2>Academic</h2>
       <p class="small muted">Hackathons, quizzes, debates & more</p>
       <span class="accent">Explore Academic &rarr;</span>
     </a>
     <a href="/esports" class="card category-card" data-category="ESPORTS">
+      <span class="cat-index">03 / 03</span>
       <h2>Esports</h2>
       <p class="small muted">BGMI, Valorant, FIFA & more</p>
       <span class="accent">Explore Esports &rarr;</span>

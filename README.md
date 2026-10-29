@@ -21,8 +21,10 @@ Besides the standard library it uses [`pgx`](https://github.com/jackc/pgx)
 [`alice`](https://github.com/justinas/alice) (middleware chains),
 [`form`](https://github.com/go-playground/form) (decoding HTML forms) and
 `golang.org/x/time/rate` (rate limiting). Pages are server-rendered with
-`html/template`, with one CSS file and one small JavaScript file. It's a
-rewrite of the earlier Node/Express + Angular version.
+`html/template`. The browser side is one CSS file, a small script for tabs,
+toasts and live updates, and optional eye candy: a [three.js](https://threejs.org)
+scene behind every page (a smashable 3D orb on the home page) plus page
+animations. It's a rewrite of the earlier Node/Express + Angular version.
 
 ## Getting started
 
@@ -229,7 +231,9 @@ internal/
   assert/                test helpers
 ui/
   html/                  base.tmpl, partials/*.tmpl, pages/*.tmpl
-  static/                app.css, app.js
+  static/                app.css, app.js (tabs, toasts, live updates),
+                         fx.js (three.js scenes), motion.js (animations),
+                         vendor/ (three.js r170, MIT)
 Makefile                 run, seed, audit and build commands
 ```
 
@@ -241,7 +245,9 @@ Where to make a change:
   tables, so a new column on an existing table needs an
   `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...` line there.
 - **A page's look**: `ui/html/pages/`
-- **Styling**: `ui/static/app.css`
+- **Styling**: `ui/static/app.css` (flat colours only, no gradients)
+- **The 3D scenes or animations**: `ui/static/fx.js` and `ui/static/motion.js`.
+  Both skip themselves when the visitor has "reduce motion" switched on
 - **A new URL**: `cmd/web/routes.go`
 
 ## How it works

@@ -3,7 +3,7 @@
 {{define "main"}}
 {{$c := $.Competition}}
 <div data-category="{{$c.Category}}">
-  <div class="banner-img tall">{{if $c.Banner}}<img src="{{$c.Banner}}" alt="">{{else}}No banner{{end}}</div>
+  <div class="banner-img tall">{{if $c.Banner}}<img src="{{$c.Banner}}" alt="">{{else}}<span class="banner-fallback" aria-hidden="true">{{lower $c.Category}}</span>{{end}}</div>
 
   <div class="container narrow page">
     <div class="row">

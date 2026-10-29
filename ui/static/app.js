@@ -14,6 +14,7 @@ function toast(message, kind) {
   el.textContent = message;
   box.appendChild(el);
   setTimeout(() => el.remove(), 4000);
+  document.dispatchEvent(new CustomEvent("arena:toast", { detail: { message, kind } }));
 }
 
 // The server's flash message (set after a form action) shows as a toast.
@@ -167,6 +168,7 @@ if ((signedIn || competitionId) && window.EventSource) {
     // the fresh live sections (marked with data-live).
     let pending = null;
     const refresh = () => {
+      document.dispatchEvent(new CustomEvent("arena:live")); // fx.js and motion.js react to this
       clearTimeout(pending); // several events at once -> one refresh
       pending = setTimeout(async () => {
         const res = await fetch(location.pathname, { headers: { Accept: "text/html" } });

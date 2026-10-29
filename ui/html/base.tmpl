@@ -7,12 +7,13 @@
   <title>{{template "title" .}} · ArenaSuite</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
-<body {{if .User}}data-user="1"{{end}} {{with .LiveID}}data-competition="{{.}}"{{end}}>
+<body {{if eq .Path "/"}}class="home"{{end}} {{if .User}}data-user="1"{{end}} {{with .LiveID}}data-competition="{{.}}"{{end}}>
   {{template "nav" .}}
+  {{template "ticker" .}}
 
   <main>{{template "main" .}}</main>
 
-  <footer class="site"><div class="container">ArenaSuite · college competitions in one place</div></footer>
+  <footer class="site"><div class="container row between"><span>ArenaSuite · college competitions in one place</span><span>© {{.CurrentYear}} · type “arena” for a surprise</span></div></footer>
 
   <div id="toasts" class="toasts"></div>
   {{with .FlashError}}<div id="flash" hidden data-kind="error" data-msg="{{.}}"></div>
@@ -22,6 +23,9 @@
     {{with .Flash}}<div class="container"><p class="notice green">{{.}}</p></div>{{end}}
   </noscript>
   <script src="/static/app.js"></script>
+  {{/* Optional eye candy: the three.js scenes and page motion. */}}
+  <script type="module" src="/static/fx.js"></script>
+  <script type="module" src="/static/motion.js"></script>
 </body>
 </html>
 {{end}}

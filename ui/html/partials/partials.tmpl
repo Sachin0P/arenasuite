@@ -15,7 +15,7 @@
 {{/* One competition card. */}}
 {{define "comp-card"}}
 <a href="/competitions/{{.ID}}" class="card flush" data-category="{{.Category}}">
-  <div class="banner-img">{{if .Banner}}<img src="{{.Banner}}" alt="">{{else}}No banner{{end}}</div>
+  <div class="banner-img">{{if .Banner}}<img src="{{.Banner}}" alt="">{{else}}<span class="banner-fallback" aria-hidden="true">{{lower .Category}}</span>{{end}}</div>
   <div class="card-body">
     <div class="row">{{template "cat" .Category}} {{template "status" .Status}}</div>
     <h3 class="mt">{{.Name}}</h3>
