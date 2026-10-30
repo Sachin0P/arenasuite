@@ -357,6 +357,10 @@ const KIT_FOR = {
 // ---------- the floating kit behind every page ----------
 
 function backgroundScene() {
+  // Phones skip the floating kit: on a small screen it's clutter behind the
+  // text, and it saves battery.
+  if (matchMedia("(max-width: 640px)").matches) return null;
+
   const canvas = document.createElement("canvas");
   canvas.id = "bg-3d";
   canvas.setAttribute("aria-hidden", "true");
