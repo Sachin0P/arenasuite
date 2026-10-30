@@ -169,8 +169,10 @@ code { font-family: var(--mono); color: var(--accent-deep); }
 }
 .badge[hidden] { display: none; }
 
+/* Avatars are a fixed size. max-width: none undoes the global img rule,
+   whose percentage would let a crowded nav squash a photo into a sliver. */
 .avatar {
-  width: 30px; height: 30px; border-radius: 50%;
+  width: 30px; height: 30px; max-width: none; border-radius: 50%;
   background: var(--sage); color: var(--choc); font-size: 0.8rem; font-weight: 900;
   display: inline-flex; align-items: center; justify-content: center; object-fit: cover; flex-shrink: 0;
   border: 2px solid var(--paper); outline: 2px solid var(--choc);
@@ -179,7 +181,7 @@ code { font-family: var(--mono); color: var(--accent-deep); }
 .avatar.big { width: 64px; height: 64px; font-size: 1.4rem; }
 
 /* Account menu and mobile menu use <details>, so they open without JS. */
-details.menu { position: relative; }
+details.menu { position: relative; flex-shrink: 0; }
 details.menu > summary { list-style: none; cursor: pointer; }
 details.menu > summary::-webkit-details-marker { display: none; }
 .menu-panel {
