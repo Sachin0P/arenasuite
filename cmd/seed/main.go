@@ -7,6 +7,10 @@
 // the login page. Running it again is safe: users are upserted, and the
 // sample organization and competitions are only created if they don't exist
 // yet.
+//
+// To add a batch of generated test accounts instead of the sample data:
+//
+//	make db/seed/fake count=30
 package main
 
 import (
@@ -29,23 +33,25 @@ func main() {
 		dsn            string
 		domain         string
 		defaultCollege string
+		fakeUsers      int
 	)
 
 	flag.StringVar(&dsn, "db-dsn", os.Getenv("DATABASE_URL"), "PostgreSQL data source name")
 	flag.StringVar(&domain, "allowed-email-domain", envString("ALLOWED_EMAIL_DOMAIN", "thapar.edu"), "Email domain for the sample users")
 	flag.StringVar(&defaultCollege, "default-college", envString("DEFAULT_COLLEGE", "Thapar University"), "College of the sample users")
+	flag.IntVar(&fakeUsers, "fake-users", 0, "Add this many fake test users instead of the sample data")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	err := run(dsn, domain, defaultCollege)
+	err := run(dsn, domain, defaultCollege, fakeUsers)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
 }
 
-func run(dsn, domain, defaultCollege string) error {
+func run(dsn, domain, defaultCollege string, fakeUsers int) error {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return err
@@ -58,6 +64,10 @@ func run(dsn, domain, defaultCollege string) error {
 	_, err = db.ExecContext(ctx, models.Schema)
 	if err != nil {
 		return err
+	}
+
+	if fakeUsers > 0 {
+		return seedFakeUsers(db, fakeUsers, domain, defaultCollege)
 	}
 
 	users := []struct{ googleID, name, email, role string }{

@@ -31,6 +31,11 @@ run/web:
 db/seed: confirm
 	go run ./cmd/seed
 
+## db/seed/fake count=$1: add fake test users to the database (30 by default)
+.PHONY: db/seed/fake
+db/seed/fake: confirm
+	go run ./cmd/seed -fake-users=$(or $(count),30)
+
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
 db/psql:

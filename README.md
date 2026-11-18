@@ -105,6 +105,10 @@ sign in as any user in the database without Google.
 | Olivia Organizer | organizer (owns the sample organization) |
 | Priya, Raj, Sam, Tara | participants |
 
+`make db/seed/fake` adds generated accounts with `fake.user001@…` style emails.
+Most are participants; every 10th is an organizer, every 12th is suspended and
+every 9th has an unfinished profile. Running it again updates the same accounts.
+
 Tip: use a normal and a private browser window to be two users at once, for
 example an organizer entering scores and a participant watching them update live.
 
@@ -174,6 +178,7 @@ Be careful with the URL:
 | List the make targets | `make help` |
 | Run the server | `make run/web` |
 | Add sample data | `make db/seed` |
+| Add fake test users | `make db/seed/fake` (or `make db/seed/fake count=100`) |
 | Run the tests | `go test ./...` |
 | Format, vet and test everything | `make tidy` then `make audit` |
 | Open the local database in a terminal | `psql arenasuite` (for a hosted one: `psql "<connection URL>"`) |
@@ -347,7 +352,7 @@ old version.
 - **Sessions** are rows in the `sessions` table. Expired ones are deleted
   every few minutes while the app runs. To sign everyone out at once, run
   `DELETE FROM sessions;` in the Neon SQL editor.
-- Don't run `make db/seed` or experiments against the live database.
+- Don't run `make db/seed`, `make db/seed/fake` or experiments against the live database.
   Use a local database or a Neon `dev` branch instead (see
   [Sharing a database](#sharing-a-database)).
 
