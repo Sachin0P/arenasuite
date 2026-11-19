@@ -97,7 +97,7 @@ code { font-family: var(--mono); color: var(--accent-deep); }
 
 #bg-3d {
   position: fixed; inset: 0; width: 100vw; height: 100vh;
-  z-index: -1; pointer-events: none; opacity: 0.5;
+  z-index: -1; pointer-events: none; opacity: 0.32;
   transition: opacity 0.6s;
 }
 .home #bg-3d { opacity: 0.3; }
@@ -340,6 +340,10 @@ a.card:hover .banner-fallback { translate: -14px 0; opacity: 1; color: var(--acc
 }
 .tabs a:hover { color: var(--text); background: var(--surface); }
 .tabs a.active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+/* Tab panels hold long text (descriptions, rules, fixtures), so they sit on
+   a solid sheet of paper and the floating 3D kit never runs through it. */
+.tab-panel { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 22px 24px; }
+.tab-panel .pre { max-width: 75ch; }
 /* With JavaScript on, only the active panel is shown. */
 .js .tab-panel { display: none; }
 .js .tab-panel.active { display: block; animation: slide-in 0.45s var(--ease-out); }
@@ -604,6 +608,7 @@ main { animation: rise 0.6s var(--ease-out); }
   .category-card .accent { margin-top: 8px; }
 
   .tabs { margin-bottom: 18px; }
+  .tab-panel { padding: 16px 14px; }
   /* Filter rows: dropdowns share each line evenly, and the button gets a
      full-width line of its own. */
   .inputs-row > select { flex: 1 1 130px; }
