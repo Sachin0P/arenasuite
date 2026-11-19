@@ -520,10 +520,10 @@ footer.site {
 .magnetic { translate: var(--mx, 0px) var(--my, 0px); }
 
 .cursor-dot, .cursor-ring { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100; border-radius: 50%; }
-.cursor-dot { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: var(--choc); }
-.cursor-ring { width: 36px; height: 36px; margin: -18px 0 0 -18px; border: 2px solid var(--choc); transition: width 0.25s var(--ease-out), height 0.25s var(--ease-out), margin 0.25s var(--ease-out), background 0.25s; }
-.cursor-ring.hover { width: 64px; height: 64px; margin: -32px 0 0 -32px; background: rgb(174 191 154 / 0.45); }
-.cursor-ring.down { width: 22px; height: 22px; margin: -11px 0 0 -11px; }
+.cursor-dot { width: 4px; height: 4px; margin: -2px 0 0 -2px; background: var(--choc); }
+.cursor-ring { width: 20px; height: 20px; margin: -10px 0 0 -10px; border: 1.5px solid var(--choc); transition: width 0.25s var(--ease-out), height 0.25s var(--ease-out), margin 0.25s var(--ease-out), background 0.25s; }
+.cursor-ring.hover { width: 34px; height: 34px; margin: -17px 0 0 -17px; background: rgb(174 191 154 / 0.45); }
+.cursor-ring.down { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
 .has-cursor, .has-cursor a, .has-cursor button { cursor: none; }
 .has-cursor input, .has-cursor textarea, .has-cursor select { cursor: auto; }
 
